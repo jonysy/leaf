@@ -28,11 +28,10 @@
 //! [backprop]: https://en.wikipedia.org/wiki/Backpropagation
 
 #[allow(unused_import_braces)]
-pub use self::sgd::{Momentum};
+pub use self::sgd::Momentum;
 pub mod sgd;
 
 use co::{IBackend, MemoryType, SharedTensor};
-use conn::NN;
 use solver::*;
 use layer::*;
 use util::*;

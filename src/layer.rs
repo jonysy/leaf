@@ -959,8 +959,8 @@ pub trait ILayer<B: IBackend> : ComputeOutput<f32, B> + ComputeInputGradient<f32
         let weights_data_: Vec<&SharedTensor<f32>> = wgts.iter().enumerate().map(|(_, val)| &**val).collect();
 
         let out_ref = output_data.iter().cloned().collect::<Vec<_>>();
-        let mut out = &mut out_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
-        let mut output_w = &mut out.iter_mut().map(|a| a).collect::<Vec<_>>();
+        let out = &mut out_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
+        let output_w = &mut out.iter_mut().map(|a| a).collect::<Vec<_>>();
         let mut output_data_: Vec<&mut SharedTensor<f32>> = output_w.iter_mut().enumerate().map(|(_, val)| &mut ***val).collect();
 
         self.compute_output(backend, &weights_data_, &input_data_, &mut output_data_);
@@ -990,8 +990,8 @@ pub trait ILayer<B: IBackend> : ComputeOutput<f32, B> + ComputeInputGradient<f32
         let inp_data: Vec<_> = input_data.iter().map(|b| b.read().unwrap()).collect();
         let input_data_: Vec<&SharedTensor<f32>> = inp_data.iter().enumerate().map(|(_, val)| &**val).collect();
         let btm_gradient_ref = input_gradients.iter().cloned().collect::<Vec<_>>();
-        let mut btm_gradient = &mut btm_gradient_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
-        let mut input_gradient = &mut btm_gradient.iter_mut().map(|a| a).collect::<Vec<_>>();
+        let btm_gradient = &mut btm_gradient_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
+        let input_gradient = &mut btm_gradient.iter_mut().map(|a| a).collect::<Vec<_>>();
         let mut input_gradients_: Vec<&mut SharedTensor<f32>> = input_gradient.iter_mut().enumerate().map(|(_, val)| &mut ***val).collect();
 
         self.compute_input_gradient(backend, &weights_data_, &output_data_, &output_gradients_, &input_data_, &mut input_gradients_);
@@ -1018,8 +1018,8 @@ pub trait ILayer<B: IBackend> : ComputeOutput<f32, B> + ComputeInputGradient<f32
         let inp_data: Vec<_> = input_data.iter().map(|b| b.read().unwrap()).collect();
         let input_data_: Vec<&SharedTensor<f32>> = inp_data.iter().enumerate().map(|(_, val)| &**val).collect();
         let wgt_gradient_ref = weights_gradients.iter().cloned().collect::<Vec<_>>();
-        let mut wgt_gradient = &mut wgt_gradient_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
-        let mut weights_gradient = &mut wgt_gradient.iter_mut().map(|a| a).collect::<Vec<_>>();
+        let wgt_gradient = &mut wgt_gradient_ref.iter().map(|b| b.write().unwrap()).collect::<Vec<_>>();
+        let weights_gradient = &mut wgt_gradient.iter_mut().map(|a| a).collect::<Vec<_>>();
         let mut weights_gradients_: Vec<&mut SharedTensor<f32>> = weights_gradient.iter_mut().enumerate().map(|(_, val)| &mut ***val).collect();
 
         self.compute_parameters_gradient(backend, &output_data_, &output_gradients_, &input_data_, &mut weights_gradients_);

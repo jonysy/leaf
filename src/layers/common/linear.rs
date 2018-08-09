@@ -22,7 +22,6 @@ use std::rc::Rc;
 use co::backend::IBackend;
 use co::tensor::SharedTensor;
 use coblas::transpose::Transpose;
-use coblas::plugin::*;
 use layer::*;
 use util::{ArcLock, native_scalar, LayerOps};
 use weight::FillerType;
