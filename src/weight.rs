@@ -1,6 +1,6 @@
 //! Provides configuration of weights and their initialization.
 use rand;
-use rand::distributions::{IndependentSample, Range};
+use rand::distributions::{Distribution, Range};
 use co::{ITensorDesc, SharedTensor};
 use util::native_backend;
 use leaf_capnp::weight_config as capnp_config;
@@ -202,7 +202,7 @@ impl FillerType {
         let between = Range::new(-init_range, init_range);
         let mut rng = rand::thread_rng();
         for e in native_weight.as_mut_slice::<f32>() {
-            *e = between.ind_sample(&mut rng);
+            *e = between.sample(&mut rng);
         }
     }
 }

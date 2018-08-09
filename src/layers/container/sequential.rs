@@ -407,14 +407,14 @@ impl<'a> CapnpWrite<'a> for SequentialConfig {
         {
             let mut layers = builder.borrow().init_layers(self.layers.len() as u32);
             for (i, layer) in self.layers.iter().enumerate() {
-                let mut layer_config = layers.borrow().get(i as u32);
+                let mut layer_config = layers.reborrow().get(i as u32);
                 layer.write_capnp(&mut layer_config);
             }
         }
         {
             let mut inputs = builder.borrow().init_inputs(self.inputs.len() as u32);
             for (i, _) in self.inputs.iter().enumerate() {
-                let mut shaped_input = inputs.borrow().get(i as u32);
+                let mut shaped_input = inputs.reborrow().get(i as u32);
                 self.write_capnp_shaped_input(&mut shaped_input, i);
             }
         }

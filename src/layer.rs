@@ -811,7 +811,7 @@ impl<'a, B: IBackend> CapnpWrite<'a> for Layer<B> {
             let weights_data = self.learnable_weights_data();
 
             for (i, (name, weight)) in names.iter().zip(weights_data).enumerate() {
-                let mut capnp_weight = weights.borrow().get(i as u32);
+                let mut capnp_weight = weights.reborrow().get(i as u32);
                 capnp_weight.set_name(name);
 
                 let mut weight_lock = weight.write().unwrap();
@@ -1512,7 +1512,7 @@ impl<'a> CapnpWrite<'a> for LayerConfig {
         {
             let mut params = builder.borrow().init_params(self.params.len() as u32);
             for (i, param) in self.params.iter().enumerate() {
-                let ref mut capnp_param = params.borrow().get(i as u32);
+                let ref mut capnp_param = params.reborrow().get(i as u32);
                 param.write_capnp(capnp_param);
             }
         }
