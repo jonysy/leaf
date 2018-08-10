@@ -1,10 +1,12 @@
 [package]
 name = "leaf"
 description = "Machine Learning Framework for Hackers"
-version = "0.2.1"
+version = "0.3.0"
 authors = [
   "Maximilian Goisser <max@autumnai.com>",
-  "Michael Hirn <mj@autumnai.com>"
+  "Michael Hirn <mj@autumnai.com>",
+  # author of hard-fork:
+  "Jony <jonysy@users.noreply.github.com>"
 ]
 repository = "https://github.com/autumnai/leaf"
 homepage = "https://github.com/autumnai/leaf"
@@ -16,15 +18,21 @@ license = "MIT OR Apache-2.0"
 build = "build.rs"
 
 [dependencies]
-collenchyma = { version = "0.0.8", default-features = false, features = ["native"] } # native feature to read/write data into tensors
-collenchyma-blas = { version = "0.2.0", default-features = false, features = ["native"] } # only compiles with native feature
-collenchyma-nn = { version = "0.3.2", default-features = false }
-log = "0.4.3"
-rand = "0.5.5"
-num = "0.2.0"
 capnp = "0.8.17"
-timeit = "0.1.2"
 clippy = { version = "0.0.212", optional = true }
+log = "0.4.3"
+num = "0.2.0"
+rand = "0.5.5"
+timeit = "0.1.2"
+
+[dependencies.parenchyma]
+path = "../parenchyma"
+[dependencies.parenchyma-blas]
+path = "../parenchyma-blas"
+[dependencies.parenchyma-deep]
+path = "../parenchyma-deep"
+[dependencies.parenchyma-ml]
+path = "../parenchyma-ml"
 
 [build-dependencies]
 capnpc = "0.6.1"
@@ -33,12 +41,6 @@ capnpc = "0.6.1"
 env_logger = "0.3"
 
 [features]
-default = ["native"]
-native = ["collenchyma-blas/native", "collenchyma-nn/native"]
-cuda = ["collenchyma/cuda", "collenchyma-blas/cuda", "collenchyma-nn/cuda"]
-opencl = ["collenchyma/opencl", "collenchyma-blas/opencl", "collenchyma-nn/opencl"]
-
-travis = ["native"]
 dev = []
 unstable = [] # for travis-cargo
 lint = ["clippy"]

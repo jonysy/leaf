@@ -6,12 +6,10 @@
 //! The max function used in ReLU is usually faster to compute than the exponentiation
 //! needed in a Sigmoid layer.
 
-use co::{IBackend,SharedTensor};
-use conn::Relu;
-#[cfg(all(feature="cuda", not(feature="native")))]
-use conn::ReluPointwise;
 use layer::*;
-use util::ArcLock;
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug, Clone)]
 #[allow(missing_copy_implementations)]
@@ -23,7 +21,7 @@ pub struct ReLU;
 // Only on CUDA
 //
 #[cfg(all(feature="cuda", not(feature="native")))]
-impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ILayer<B> for ReLU {
+impl ILayer for ReLU {
     impl_ilayer_activation!();
 
     fn compute_in_place(&self) -> bool {
@@ -31,27 +29,27 @@ impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ILayer<B> for ReLU {
     }
 
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<B>,
-               input_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               input_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>) {
+               backend: ::std::rc::Rc<LeafBackend>,
+               input_data: &mut Vec<ArcLockTensor>,
+               input_gradient: &mut Vec<ArcLockTensor>,
+               weights_data: &mut Vec<ArcLockTensor>,
+               weights_gradient: &mut Vec<ArcLockTensor>,
+               output_data: &mut Vec<ArcLockTensor>,
+               output_gradient: &mut Vec<ArcLockTensor>) {
         if let Some(inp) = input_data.get(0) {
             let read_inp = inp.read().unwrap();
-            let input_desc = read_inp.desc();
-            input_gradient[0].write().unwrap().resize(input_desc).unwrap();
-            output_data[0].write().unwrap().resize(input_desc).unwrap();
-            output_gradient[0].write().unwrap().resize(input_desc).unwrap();
+            let input_desc = read_inp.shape();
+            input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
+            output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
+            output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
         }
     }
 }
 
 #[cfg(all(feature="cuda", not(feature="native")))]
-impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ComputeOutput<f32, B> for ReLU {
+impl ComputeOutput<f32> for ReLU {
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       _weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) {
@@ -63,9 +61,9 @@ impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ComputeOutput<f32, B> for ReL
 }
 
 #[cfg(all(feature="cuda", not(feature="native")))]
-impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ComputeInputGradient<f32, B> for ReLU {
+impl ComputeInputGradient<f32> for ReLU {
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
@@ -79,38 +77,38 @@ impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ComputeInputGradient<f32, B> 
 }
 
 #[cfg(all(feature="cuda", not(feature="native")))]
-impl<B: IBackend + Relu<f32> + ReluPointwise<f32>> ComputeParametersGradient<f32, B> for ReLU {}
+impl ComputeParametersGradient<f32> for ReLU {}
 
 //
 // ReLU without ReLUPointwise
 // Only on CUDA
 //
 #[cfg(feature="native")]
-impl<B: IBackend + Relu<f32>> ILayer<B> for ReLU {
+impl ILayer for ReLU {
     impl_ilayer_activation!();
 
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<B>,
-               input_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               input_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>) {
+               backend: ::std::rc::Rc<LeafBackend>,
+               input_data: &mut Vec<ArcLockTensor>,
+               input_gradient: &mut Vec<ArcLockTensor>,
+               weights_data: &mut Vec<ArcLockTensor>,
+               weights_gradient: &mut Vec<ArcLockTensor>,
+               output_data: &mut Vec<ArcLockTensor>,
+               output_gradient: &mut Vec<ArcLockTensor>) {
         if let Some(inp) = input_data.get(0) {
             let read_inp = inp.read().unwrap();
-            let input_desc = read_inp.desc();
-            input_gradient[0].write().unwrap().resize(input_desc).unwrap();
-            output_data[0].write().unwrap().resize(input_desc).unwrap();
-            output_gradient[0].write().unwrap().resize(input_desc).unwrap();
+            let input_desc = read_inp.shape();
+            input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
+            output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
+            output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
         }
     }
 }
 
 #[cfg(feature="native")]
-impl<B: IBackend + Relu<f32>> ComputeOutput<f32, B> for ReLU {
+impl ComputeOutput<f32> for ReLU {
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       _weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) {
@@ -122,9 +120,9 @@ impl<B: IBackend + Relu<f32>> ComputeOutput<f32, B> for ReLU {
 }
 
 #[cfg(feature="native")]
-impl<B: IBackend + Relu<f32>> ComputeInputGradient<f32, B> for ReLU {
+impl ComputeInputGradient<f32> for ReLU {
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
@@ -138,4 +136,4 @@ impl<B: IBackend + Relu<f32>> ComputeInputGradient<f32, B> for ReLU {
 }
 
 #[cfg(feature="native")]
-impl<B: IBackend + Relu<f32>> ComputeParametersGradient<f32, B> for ReLU {}
+impl ComputeParametersGradient<f32> for ReLU {}

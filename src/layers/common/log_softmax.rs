@@ -1,54 +1,56 @@
 //! Computes the logarithmic softmax of its input.
 //!
-use co::{IBackend, SharedTensor};
-use conn;
+
 use layer::*;
-use util::ArcLock;
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug, Clone)]
 #[allow(missing_copy_implementations)]
 /// LogSoftmax Layer
 pub struct LogSoftmax;
 
-impl<B: IBackend + conn::LogSoftmax<f32>> ILayer<B> for LogSoftmax {
+impl ILayer for LogSoftmax {
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<B>,
-               input_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               input_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>) {
-        let input_desc = input_data[0].read().unwrap().desc().clone();
-        input_gradient[0].write().unwrap().resize(&input_desc).unwrap();
-        output_data[0].write().unwrap().resize(&input_desc).unwrap();
-        output_gradient[0].write().unwrap().resize(&input_desc).unwrap();
+               backend: ::std::rc::Rc<LeafBackend>,
+               input_data: &mut Vec<ArcLockTensor>,
+               input_gradient: &mut Vec<ArcLockTensor>,
+               weights_data: &mut Vec<ArcLockTensor>,
+               weights_gradient: &mut Vec<ArcLockTensor>,
+               output_data: &mut Vec<ArcLockTensor>,
+               output_gradient: &mut Vec<ArcLockTensor>) {
+        let input_read = input_data[0].read().unwrap();
+        let input_desc = input_read.shape();
+        input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
+        output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
+        output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
     }
 }
 
-impl<B: IBackend + conn::LogSoftmax<f32>> ComputeOutput<f32, B> for LogSoftmax {
+impl ComputeOutput<f32> for LogSoftmax {
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       _weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) {
-        backend.log_softmax_plain(input_data[0], output_data[0]).unwrap();
+        backend.log_softmax(input_data[0], output_data[0]).unwrap();
     }
 }
 
-impl<B: IBackend + conn::LogSoftmax<f32>> ComputeInputGradient<f32, B> for LogSoftmax {
+impl ComputeInputGradient<f32> for LogSoftmax {
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
                               input_data: &[&SharedTensor<f32>],
                               input_gradients: &mut [&mut SharedTensor<f32>]) {
-        backend.log_softmax_grad_plain(output_data[0], output_gradients[0], input_gradients[0]).unwrap();
+        backend.log_softmax_grad(output_data[0], output_gradients[0], input_gradients[0]).unwrap();
     }
 }
 
-impl<B: IBackend + conn::LogSoftmax<f32>> ComputeParametersGradient<f32, B> for LogSoftmax { }
+impl ComputeParametersGradient<f32> for LogSoftmax { }
 
 impl ::std::default::Default for LogSoftmax {
     fn default() -> LogSoftmax {

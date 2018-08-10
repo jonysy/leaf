@@ -19,14 +19,14 @@
 //! In the context of convolutional neural networks this layer is also
 //! called a "fully-connected layer" if it is used at the end of the network.
 use std::rc::Rc;
-use co::backend::IBackend;
-use co::tensor::SharedTensor;
-use coblas::transpose::Transpose;
 use layer::*;
-use util::{ArcLock, native_scalar, LayerOps};
 use weight::FillerType;
 use leaf_capnp::linear_config as capnp_config;
 use capnp_util::*;
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::{SharedTensor, TensorShape};
+use parenchyma_blas::Transposition;
 
 #[derive(Debug)]
 /// Linear Layer
@@ -40,8 +40,8 @@ pub struct Linear {
 impl Linear {
     /// Create a Linear layer from a LinearConfig.
     pub fn from_config(config: &LinearConfig) -> Linear {
-        let one = native_scalar(1f32);
-        let zero = native_scalar(0f32);
+        let one = SharedTensor::scalar(1f32);
+        let zero = SharedTensor::scalar(0f32);
 
         Linear {
             output_size: config.output_size,
@@ -67,93 +67,87 @@ impl Linear {
     }
 }
 
-impl<B: IBackend + LayerOps<f32>> ILayer<B> for Linear {
+impl ILayer for Linear {
     impl_ilayer_common!();
 
     fn auto_weight_blobs(&self) -> bool {
         true
     }
 
-    fn init(&mut self, backend: Rc<B>) {
-        let device = <B as IBackend>::device(&backend);
-        let _ = self.one.add_device(device);
-        self.one.sync(device).unwrap();
-        let _ = self.zero.add_device(device);
-        self.zero.sync(device).unwrap();
+    fn init(&mut self, backend: Rc<LeafBackend>) {
+
     }
 
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<B>,
-               input_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               input_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>) {
+               backend: ::std::rc::Rc<LeafBackend>,
+               input_data: &mut Vec<ArcLockTensor>,
+               input_gradient: &mut Vec<ArcLockTensor>,
+               weights_data: &mut Vec<ArcLockTensor>,
+               weights_gradient: &mut Vec<ArcLockTensor>,
+               output_data: &mut Vec<ArcLockTensor>,
+               output_gradient: &mut Vec<ArcLockTensor>) {
         let input = input_data[0].read().unwrap();
         // reshape top
-        let output_shape = self.calculate_output_shape(input.desc());
-        output_data[0].write().unwrap().resize(&output_shape).unwrap();
-        output_gradient[0].write().unwrap().resize(&output_shape).unwrap();
+        let output_shape = self.calculate_output_shape(input.shape().dimensions());
+        output_data[0].write().unwrap().resize(&output_shape[..]).unwrap();
+        output_gradient[0].write().unwrap().resize(&output_shape[..]).unwrap();
         // reshape weight
-        let weight_shape = self.calculate_weight_shape(input.desc());
+        let weight_shape = self.calculate_weight_shape(input.shape().dimensions());
         // TODO: change weight creation to not require this
         if let Some(weight) = weights_data.get(0) {
-            weight.write().unwrap().resize(&weight_shape).unwrap();
+            weight.write().unwrap().resize(&weight_shape[..]).unwrap();
             let filler = FillerType::Glorot {
-                input_size: Self::calculate_input_size(input.desc()),
+                input_size: Self::calculate_input_size(input.shape().dimensions()),
                 output_size: self.output_size,
             };
             filler.fill(&mut weight.write().unwrap());
 
-            let native_backend = ::util::native_backend();
             let bound_weight = weight.read().unwrap();
-            let native_output = bound_weight.get(native_backend.device()).unwrap().as_native().unwrap();
         }
         if let Some(weight) = weights_gradient.get(0) {
-            weight.write().unwrap().resize(&weight_shape).unwrap();
+            weight.write().unwrap().resize(&weight_shape[..]).unwrap();
         }
     }
 }
 
-impl<B: IBackend + LayerOps<f32>> ComputeOutput<f32, B> for Linear {
+impl ComputeOutput<f32> for Linear {
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) {
-        backend.gemm_plain(&self.one, Transpose::NoTrans, input_data[0], Transpose::Trans, weights[0], &self.zero, output_data[0]).unwrap();
+        backend.gemm(&self.one, Transposition::NoTranspose, input_data[0], Transposition::Transpose, weights[0], &self.zero, output_data[0]).unwrap();
         let has_bias_term = false; // TODO: implement bias term
         if has_bias_term {
             let bias_multiplier = unimplemented!();
             let bias_data = unimplemented!();
-            backend.gemm_plain(&self.one, Transpose::NoTrans, bias_multiplier, Transpose::NoTrans, bias_data, &self.one, output_data[0]).unwrap();
+            backend.gemm(&self.one, Transposition::NoTranspose, bias_multiplier, Transposition::NoTranspose, bias_data, &self.one, output_data[0]).unwrap();
         }
     }
 }
 
-impl<B: IBackend + LayerOps<f32>> ComputeInputGradient<f32, B> for Linear {
+impl ComputeInputGradient<f32> for Linear {
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
                               input_data: &[&SharedTensor<f32>],
                               input_gradients: &mut [&mut SharedTensor<f32>]) {
         // Gradient with respect to input data
-        backend.gemm_plain(&self.one, Transpose::NoTrans, output_gradients[0], Transpose::NoTrans, weights_data[0], &self.zero, input_gradients[0]).unwrap();
+        backend.gemm(&self.one, Transposition::NoTranspose, output_gradients[0], Transposition::NoTranspose, weights_data[0], &self.zero, input_gradients[0]).unwrap();
     }
 }
 
-impl<B: IBackend + LayerOps<f32>> ComputeParametersGradient<f32, B> for Linear {
+impl ComputeParametersGradient<f32> for Linear {
     fn compute_parameters_gradient(&self,
-                                   backend: &B,
+                                   backend: &LeafBackend,
                                    output_data: &[&SharedTensor<f32>],
                                    output_gradients: &[&SharedTensor<f32>],
                                    input_data: &[&SharedTensor<f32>],
                                    parameters_gradients: &mut [&mut SharedTensor<f32>]) {
         // gradient w.r.t. weights
-        backend.gemm_plain(&self.one, Transpose::Trans, output_gradients[0], Transpose::NoTrans, input_data[0], &self.zero, parameters_gradients[0]).unwrap();
+        backend.gemm(&self.one, Transposition::Transpose, output_gradients[0], Transposition::NoTranspose, input_data[0], &self.zero, parameters_gradients[0]).unwrap();
 
         // TODO: implement gradient w.r.t bias
         // if (bias_term_ && this->param_propagate_down_[1]) {

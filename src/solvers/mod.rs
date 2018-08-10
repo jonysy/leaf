@@ -31,15 +31,16 @@
 pub use self::sgd::Momentum;
 pub mod sgd;
 
-use co::{IBackend, MemoryType, SharedTensor};
 use solver::*;
 use layer::*;
-use util::*;
 
-trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f32>> : ISolver<SolverB, NetB> {
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
+
+trait SGDSolver : ISolver {
     fn compute_update_value(&mut self,
                             config: &SolverConfig,
-                            weight_blob: &ArcLock<SharedTensor<f32>>,
+                            weight_blob: &ArcLockTensor,
                             history_blob_id: usize,
                             global_lr: &f32,
                             blob_lr: &f32);
@@ -57,30 +58,22 @@ trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f3
     /// [3]: https://en.wikipedia.org/wiki/Recurrent_neural_network
     /// [4]: https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm
     #[allow(unused_must_use)]
-    fn clip_gradients<B: IBackend + LayerOps<f32> + 'static>(&self, config: &SolverConfig, net: &mut Layer<B>) {
+    fn clip_gradients(&self, config: &SolverConfig, net: &mut Layer) {
         // skip clipping gradients if SolverConfig.clip_gradients is set to None
         if let Some(clip_threshold) = config.clip_gradients {
-            let native = native_backend();
 
             let net_gradients = net.learnable_weights_gradients();
             let mut sumsq_diff = 0f32;
             let backend = self.backend();
             for net_gradient in net_gradients.clone() {
                 let gradient = net_gradient.read().unwrap();
-                let mut result = SharedTensor::<f32>::new(IBackend::device(backend), &1).unwrap();
+                let mut result = SharedTensor::<f32>::from(1);
                 // gradient.sumsq_diff(self.backend(), &mut result);
-                self.backend().dot_plain(&gradient, &gradient, &mut result);
+                self.backend().dot(&gradient, &gradient, &mut result);
 
-                let mut result = SharedTensor::<f32>::new(IBackend::device(backend), &1).unwrap();
-                match result.add_device(native.device()) { _ => result.sync(native.device()).unwrap() }
-                match  result.get(native.device()).unwrap() {
-                    &MemoryType::Native(ref sumsq_result) => {
-                        let sumsq_diff_slice = sumsq_result.as_slice::<f32>();
-                        sumsq_diff += sumsq_diff_slice[0];
-                    },
-                    #[cfg(any(feature = "opencl", feature = "cuda"))]
-                    _ => {}
-                }
+                let mut result = SharedTensor::<f32>::from(1);
+                let sumsq_diff_slice = result.as_slice().unwrap();
+                sumsq_diff += sumsq_diff_slice[0];
             }
             let l2norm_diff = sumsq_diff.sqrt();
             if l2norm_diff > clip_threshold {
@@ -91,7 +84,7 @@ trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f3
                       clip_threshold,
                       scale_factor);
 
-                let mut scale_shared = native_scalar(scale_factor);
+                let mut scale_shared = SharedTensor::scalar(scale_factor);
 
                 for weight_gradient in net_gradients {
                     let mut gradient = weight_gradient.write().unwrap();
@@ -107,13 +100,12 @@ trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f3
     /// To counteract that we are accumulating the gradients over multiple samples,
     /// we need to scale the gradients down to the equivalent of a single sample.</br>
     /// E.g. with a `minibatch_size` of 4 we need to scale the gradient by 0.25 (= 1/4).
-    fn normalize(&self, config: &SolverConfig, weight_blob: &ArcLock<SharedTensor<f32>>) {
+    fn normalize(&self, config: &SolverConfig, weight_blob: &ArcLockTensor) {
         if config.minibatch_size > 1 {
             let scale_factor = 1f32 / config.minibatch_size as f32;
             let mut gradient = weight_blob.write().unwrap();
-            let native = native_backend();
 
-            let mut scale_factor_shared = native_scalar(scale_factor);
+            let mut scale_factor_shared = SharedTensor::scalar(scale_factor);
             // self.backend().scal_plain(&scale_factor_shared, &mut gradient).unwrap();
             self.backend().scal(&mut scale_factor_shared, &mut gradient).unwrap();
         }
@@ -122,7 +114,7 @@ trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f3
     /// [Regularize][1] the gradient according to the configured [RegularizationMethod][2].
     /// [1]: https://cs231n.github.io/neural-networks-2/#reg
     /// [2]: ../solver/enum.RegularizationMethod.html
-    fn regularize(&self, config: &SolverConfig, weight_gradient: &ArcLock<SharedTensor<f32>>, blob_weight_decay: Option<f32>) {
+    fn regularize(&self, config: &SolverConfig, weight_gradient: &ArcLockTensor, blob_weight_decay: Option<f32>) {
         if let Some(global_weight_decay) = config.weight_decay {
             if let Some(regularization_method) = config.regularization_method {
                 match blob_weight_decay {
@@ -130,8 +122,7 @@ trait SGDSolver<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f3
                         let local_decay = global_weight_decay * weight_decay_mult;
                         match regularization_method {
                             RegularizationMethod::L2 => {
-                                let native = native_backend();
-                                let decay_shared = native_scalar(local_decay);
+                                let decay_shared = SharedTensor::scalar(local_decay);
                                 let gradient = &mut weight_gradient.write().unwrap();
                                 // gradient.regularize_l2(self.backend(), &decay_shared);
                                 // backend.axpy_plain(&decay_shared, &self.data, &mut self.diff).unwrap();

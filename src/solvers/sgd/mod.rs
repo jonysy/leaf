@@ -24,15 +24,14 @@
 #[macro_export]
 macro_rules! impl_isolver_sgd {
     ($t:ty) => (
-        impl<SolverB: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f32> + 'static> ISolver<SolverB, NetB> for $t {
+        impl ISolver for $t {
             /// Initialize the SGD Momentum solver, allocating memory for its history.
-            fn init(&mut self, net: &Layer<NetB>) {
+            fn init(&mut self, net: &Layer) {
                 self.history = Vec::with_capacity(net.learnable_weights_gradients().len());
 
                 for weight_gradient in net.learnable_weights_gradients() {
-                    let shape = weight_gradient.read().unwrap().desc().clone();
-                    let mut tensor = SharedTensor::new(IBackend::device(&*self.backend),
-                                                       &shape).unwrap();
+                    let shape = weight_gradient.read().unwrap().shape().clone();
+                    let mut tensor = SharedTensor::from(shape);
 
                     let filler = ::weight::FillerType::Constant { value: 0f32 };
                     filler.fill(&mut tensor);
@@ -42,15 +41,15 @@ macro_rules! impl_isolver_sgd {
                 }
             }
 
-            fn compute_update(&mut self, config: &SolverConfig, net: &mut Layer<NetB>, iter: usize) {
+            fn compute_update(&mut self, config: &SolverConfig, net: &mut Layer, iter: usize) {
                 let rate = config.get_learning_rate(iter);
 
-                SGDSolver::<SolverB, NetB>::clip_gradients(self, config, net);
+                SGDSolver::clip_gradients(self, config, net);
                 for (weight_id, weight_gradient) in net.learnable_weights_gradients().iter().enumerate() {
-                    SGDSolver::<SolverB, NetB>::normalize(self, config, weight_gradient);
+                    SGDSolver::normalize(self, config, weight_gradient);
                     // SGDSolver::<SolverB, NetB>::regularize(self, config, weight_gradient, net.weights_weight_decay()[weight_id]);
 
-                    SGDSolver::<SolverB, NetB>::compute_update_value(self, config,
+                    SGDSolver::compute_update_value(self, config,
                                               weight_gradient,
                                               weight_id,
                                               &rate,
@@ -58,7 +57,7 @@ macro_rules! impl_isolver_sgd {
                 }
             }
 
-            fn backend(&self) -> &SolverB {
+            fn backend(&self) -> &LeafBackend {
                 &self.backend
             }
         }

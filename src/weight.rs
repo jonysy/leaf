@@ -1,10 +1,13 @@
 //! Provides configuration of weights and their initialization.
+
+// use util::native_backend;
+
+
+use crate::capnp_util::*;
+use crate::leaf_capnp::weight_config as capnp_config;
+use parenchyma::prelude::SharedTensor;
 use rand;
 use rand::distributions::{Distribution, Range};
-use co::{ITensorDesc, SharedTensor};
-use util::native_backend;
-use leaf_capnp::weight_config as capnp_config;
-use capnp_util::*;
 
 #[derive(Debug, Clone)]
 /// Specifies training configuration for a weight blob.
@@ -52,51 +55,54 @@ impl Default for WeightConfig {
 impl WeightConfig {
     /// Checks dimensions of two blobs according to the `share_mode`.
     /// Returns an error if there is a count/shape mismatch.
-    pub fn check_dimensions<T>(&self,
-                                        tensor_one: &SharedTensor<T>,
-                                        tensor_two: &SharedTensor<T>,
-                                        param_name: String,
-                                        owner_name: String,
-                                        layer_name: String)
-                                        -> Result<(), String> {
+    pub fn check_dimensions<T>(
+        &self,
+        tensor_one: &SharedTensor<T>,
+        tensor_two: &SharedTensor<T>,
+        param_name: String,
+        owner_name: String,
+        layer_name: String) -> Result<(), String> {
+
+        let equal = tensor_one.shape().capacity() != tensor_two.shape().capacity();
+
         match self.share_mode {
             // Permissive dimension checking -- only check counts are the same.
-            DimCheckMode::Permissive => {
-                if tensor_one.desc().size() != tensor_two.desc().size() {
-                    return Err(format!("Cannot share weight '{}' owned by layer '{}' with layer '{}';
-                                count mismatch.
-                                Owner layer weight shape is {:?};
-                                Sharing layer weight shape is {:?}",
-                                       param_name,
-                                       owner_name,
-                                       layer_name,
-                                       tensor_two.desc(),
-                                       tensor_one.desc()));
-                }
+            DimCheckMode::Permissive if equal => {
+                Err(format!("Cannot share weight '{}' owned by layer '{}' with layer '{}';
+                            count mismatch.
+                            Owner layer weight shape is {:?};
+                            Sharing layer weight shape is {:?}",
+                                   param_name,
+                                    owner_name,
+                                   layer_name,
+                                   tensor_two.shape(),
+                                   tensor_one.shape()))
             }
+
             // Strict dimension checking -- all dims must be the same.
-            DimCheckMode::Strict => {
-                if tensor_one.desc().size() != tensor_two.desc().size() {
-                    return Err(format!("Cannot share weight '{}' owned by layer '{}' with layer '{}';
-                                shape mismatch.
-                                Owner layer weight shape is {:?};
-                                Sharing layer expects weight shape {:?}",
-                                       param_name,
-                                       owner_name,
-                                       layer_name,
-                                       tensor_two.desc(),
-                                       tensor_one.desc()));
-                }
+            DimCheckMode::Strict if equal => {
+                Err(format!("Cannot share weight '{}' owned by layer '{}' with layer '{}';
+                            shape mismatch.
+                            Owner layer weight shape is {:?};
+                            Sharing layer expects weight shape {:?}",
+                                   param_name,
+                                    owner_name,
+                                   layer_name,
+                                   tensor_two.shape(),
+                                   tensor_one.shape()))
+            }
+
+            _ => {
+                Ok(())
             }
         }
-        Ok(())
     }
 
     /// The multiplier on the global learning rate for this weight blob.
     pub fn lr_mult(&self) -> f32 {
         match self.lr_mult {
             Some(val) => val,
-            None => 1.0f32,
+            None => 1.0,
         }
     }
 
@@ -104,7 +110,7 @@ impl WeightConfig {
     pub fn decay_mult(&self) -> f32 {
         match self.decay_mult {
             Some(val) => val,
-            None => 1.0f32,
+            None => 1.0,
         }
     }
 }
@@ -151,7 +157,7 @@ pub enum FillerType {
     },
     /// Fills the weight blobs based on the paper:
     ///
-    /// `[Bengio and Glorot 2010]: Understanding the difficulty of training deep feedforward neural networks.`
+    /// `[Bengio and Glorot 2010]: Understanding the difficulty of training deep feed-forward neural networks.`
     ///
     /// Also known as Xavier filler.
     Glorot {
@@ -167,41 +173,33 @@ impl FillerType {
     ///
     /// This filling of weights is usually done directly after creation of the weight blob.
     pub fn fill(&self, weight: &mut SharedTensor<f32>) {
-        let native = native_backend();
-        let native_device = native.device();
-        let actual_device = weight.latest_device().clone();
-        // sync to native so we can fill
-        match weight.add_device(native_device) { _ => weight.sync(native_device).unwrap() }
-
         match *self {
-            FillerType::Constant { value } => Self::fill_constant(weight, value),
-            FillerType::Glorot { input_size, output_size } => Self::fill_glorot(weight, input_size, output_size),
-        }
+            FillerType::Constant { value } => {
+                Self::fill_constant(weight, value)
+            }
 
-        // sync back to the actual device
-        weight.sync(&actual_device).unwrap();
+            FillerType::Glorot { input_size, output_size } => {
+                Self::fill_glorot(weight, input_size, output_size)
+            }
+        }
     }
 
     /// Directly use the [Constant Filler](#variant.Constant).
     pub fn fill_constant(weight: &mut SharedTensor<f32>, value: f32) {
-        let native = native_backend();
-        let native_weight = weight.get_mut(native.device()).unwrap().as_mut_native().unwrap();
+        let weight_data = weight.as_mut_slice().unwrap();
 
-        for e in native_weight.as_mut_slice::<f32>() {
+        for e in weight_data {
             *e = value;
         }
     }
 
     /// Directly use the [Glorot Filler](#variant.Glorot).
     pub fn fill_glorot(weight: &mut SharedTensor<f32>, num_inputs: usize, num_outputs: usize) {
-        let native = native_backend();
-        let native_weight = weight.get_mut(native.device()).unwrap().as_mut_native().unwrap();
-
+        let weight_data = weight.as_mut_slice().unwrap();
         let init_range = (6.0f32 / (num_inputs as f32 + num_outputs as f32)).sqrt();
-
         let between = Range::new(-init_range, init_range);
         let mut rng = rand::thread_rng();
-        for e in native_weight.as_mut_slice::<f32>() {
+        for e in weight_data {
             *e = between.sample(&mut rng);
         }
     }

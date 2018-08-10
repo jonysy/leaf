@@ -12,24 +12,26 @@
 //! since if you keep adjusting the gradients
 //! into the same direction you will reach the optimum faster.
 //! It also makes solving more stable.
-use co::prelude::*;
+
 use layer::*;
 use solver::*;
 use solvers::SGDSolver;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use util::*;
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug)]
 /// Stochastic Gradient Descent with Momentum.
 ///
 /// See [module description][1] for more information.
 /// [1]: ./index.html
-pub struct Momentum<SolverB: IBackend + SolverOps<f32>> {
+pub struct Momentum {
     /// The gradient update from the previous iteration for each blob.
-    history: Vec<ArcLock<SharedTensor<f32>>>,
+    history: Vec<ArcLockTensor>,
     /// The backend used for computing the gradient.
-    backend: Rc<SolverB>,
+    backend: Rc<LeafBackend>,
 
     /// Scalar that temporarily holds learing rate for weight update computations
     lr: SharedTensor<f32>,
@@ -37,19 +39,17 @@ pub struct Momentum<SolverB: IBackend + SolverOps<f32>> {
     momentum: SharedTensor<f32>,
 }
 
-impl<SolverB: IBackend + SolverOps<f32>> Momentum<SolverB> {
+impl Momentum {
     /// Create a new SGD Momentum solver.
     ///
     /// Should not be called directly.
     /// Use [Solver::from_config][2] instead.
     ///
     /// [2]: ../../../solver/struct.Solver.html#method.from_config
-    pub fn new(backend: Rc<SolverB>) -> Momentum<SolverB> {
+    pub fn new(backend: Rc<LeafBackend>) -> Momentum {
         let (lr, momentum) = {
-            let device = IBackend::device(backend.as_ref());
-
-            (SharedTensor::<f32>::new(device, &1).unwrap(),
-             SharedTensor::<f32>::new(device, &1).unwrap())
+            (SharedTensor::<f32>::from(1),
+             SharedTensor::<f32>::from(1))
         };
         
         Momentum {
@@ -63,10 +63,10 @@ impl<SolverB: IBackend + SolverOps<f32>> Momentum<SolverB> {
 
 }
 
-impl<B: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f32> + 'static> SGDSolver<B, NetB> for Momentum<B> {
+impl SGDSolver for Momentum {
     fn compute_update_value(&mut self,
                             config: &SolverConfig,
-                            weight_gradient: &ArcLock<SharedTensor<f32>>,
+                            weight_gradient: &ArcLockTensor,
                             history_blob_id: usize,
                             global_lr: &f32,
                             blob_lr: &f32) {
@@ -78,25 +78,22 @@ impl<B: IBackend + SolverOps<f32>, NetB: IBackend + LayerOps<f32> + 'static> SGD
             value: config.momentum
         }.fill(&mut self.momentum);
 
-        let backend = ISolver::<B, NetB>::backend(self);
-        let device = IBackend::device(backend);
+        let backend = ISolver::backend(self);
 
         let history_blob = &self.history[history_blob_id];
 
-        let _ = weight_gradient.write().unwrap().add_device(device);
-        weight_gradient.write().unwrap().sync(device).unwrap();
-        let _ = history_blob.write().unwrap().add_device(device);
-        history_blob.write().unwrap().sync(device).unwrap();
+        backend.axpby(
+            &self.lr,
+            &weight_gradient.read().unwrap(),
+            &self.momentum,
+            &mut history_blob.write().unwrap()
+        ).unwrap();
 
-        Axpby::axpby_plain(backend,
-                           &self.lr,
-                           &weight_gradient.read().unwrap(),
-                           &self.momentum,
-                           &mut history_blob.write().unwrap()).unwrap();
-
-        backend.copy_plain(
-            &history_blob.read().unwrap(), &mut weight_gradient.write().unwrap()).unwrap();
+        backend.copy(
+            &history_blob.read().unwrap(), 
+            &mut weight_gradient.write().unwrap()
+        ).unwrap();
     }
 }
 
-impl_isolver_sgd!(Momentum<SolverB>);
+impl_isolver_sgd!(Momentum);

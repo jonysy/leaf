@@ -1,9 +1,10 @@
 //! TODO: DOC
+
 use std::collections::VecDeque;
 use std::fmt;
 
-use co::SharedTensor;
-use util::native_backend;
+use parenchyma::prelude::SharedTensor;
+
 /// A [ConfusionMatrix][wiki].
 ///
 /// [wiki]: https://en.wikipedia.org/wiki/Confusion_matrix
@@ -48,8 +49,7 @@ impl ConfusionMatrix {
     /// The prediction for each sample of the batch is found by
     /// determining which output value had the smallest loss.
     pub fn get_predictions(&self, network_out: &mut SharedTensor<f32>) -> Vec<usize> {
-        let native_infered = network_out.get(native_backend().device()).unwrap().as_native().unwrap();
-        let predictions_slice = native_infered.as_slice::<f32>();
+        let predictions_slice = network_out.as_slice().unwrap();
 
         let mut predictions = Vec::<usize>::new();
         for batch_predictions in predictions_slice.chunks(self.num_classes) {

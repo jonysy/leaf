@@ -15,11 +15,13 @@
 //! - `C` : number of feature maps
 //! - `H` : height
 //! - `W` : width
-use co::{IBackend, SharedTensor};
+
 use layer::*;
-use util::ArcLock;
 use leaf_capnp::reshape_config as capnp_config;
 use capnp_util::*;
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug, Clone)]
 /// Reshape Utility Layer
@@ -36,7 +38,7 @@ impl Reshape {
     }
 }
 
-impl<B: IBackend> ILayer<B> for Reshape {
+impl ILayer for Reshape {
     fn compute_in_place(&self) -> bool {
         true
     }
@@ -46,30 +48,30 @@ impl<B: IBackend> ILayer<B> for Reshape {
     }
 
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<B>,
-               input_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               input_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               weights_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_data: &mut Vec<ArcLock<SharedTensor<f32>>>,
-               output_gradient: &mut Vec<ArcLock<SharedTensor<f32>>>) {
-        output_data[0].write().unwrap().resize(&self.shape).unwrap();
-        output_gradient[0].write().unwrap().resize(&self.shape).unwrap();
+               backend: ::std::rc::Rc<LeafBackend>,
+               input_data: &mut Vec<ArcLockTensor>,
+               input_gradient: &mut Vec<ArcLockTensor>,
+               weights_data: &mut Vec<ArcLockTensor>,
+               weights_gradient: &mut Vec<ArcLockTensor>,
+               output_data: &mut Vec<ArcLockTensor>,
+               output_gradient: &mut Vec<ArcLockTensor>) {
+        output_data[0].write().unwrap().resize(&self.shape[..]).unwrap();
+        output_gradient[0].write().unwrap().resize(&self.shape[..]).unwrap();
     }
 }
 
-impl<B: IBackend> ComputeOutput<f32, B> for Reshape {
+impl ComputeOutput<f32> for Reshape {
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       _weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) {
     }
 }
 
-impl<B: IBackend> ComputeInputGradient<f32, B> for Reshape {
+impl ComputeInputGradient<f32> for Reshape {
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
@@ -77,7 +79,7 @@ impl<B: IBackend> ComputeInputGradient<f32, B> for Reshape {
                               input_gradients: &mut [&mut SharedTensor<f32>]) {}
 }
 
-impl<B: IBackend> ComputeParametersGradient<f32, B> for Reshape {}
+impl ComputeParametersGradient<f32> for Reshape {}
 
 #[derive(Debug, Clone)]
 /// Specifies configuration parameters for a Reshape Layer.

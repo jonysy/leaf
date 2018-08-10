@@ -3,30 +3,31 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use co::{IBackend, SharedTensor};
 use layer::*;
-use util::{ArcLock, LayerOps};
 use leaf_capnp::sequential_config as capnp_config;
 use leaf_capnp::shaped_input as capnp_shaped_input;
 use capnp_util::*;
 
+use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
+use parenchyma::prelude::SharedTensor;
+
 #[derive(Debug)] /// Sequential Layer
-pub struct Sequential<B: IBackend + LayerOps<f32>> {
-    layers: Vec<RefCell<Layer<B>>>,
+pub struct Sequential {
+    layers: Vec<RefCell<Layer>>,
 
     input_tensor_names: Vec<String>,
-    input_data_tensors: Vec<ArcLock<SharedTensor<f32>>>,
-    input_gradient_tensors: Vec<ArcLock<SharedTensor<f32>>>,
+    input_data_tensors: Vec<ArcLockTensor>,
+    input_gradient_tensors: Vec<ArcLockTensor>,
 
-    output_data_tensors: Vec<ArcLock<SharedTensor<f32>>>,
-    output_gradient_tensors: Vec<ArcLock<SharedTensor<f32>>>,
+    output_data_tensors: Vec<ArcLockTensor>,
+    output_gradient_tensors: Vec<ArcLockTensor>,
 
-    registry: HashMap<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>)>,
+    registry: HashMap<String, ArcLockTensorBlob>,
 }
 
-impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
+impl Sequential {
     /// Create a empty Sequential container layer.
-    pub fn empty() -> Sequential<B> {
+    pub fn empty() -> Sequential {
         Sequential {
             layers: vec![],
 
@@ -42,7 +43,7 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
     }
 
     /// Create a Sequential layer from a SequentialConfig.
-    pub fn from_config(backend: Rc<B>, config: &SequentialConfig) -> Sequential<B> {
+    pub fn from_config(backend: Rc<LeafBackend>, config: &SequentialConfig) -> Sequential {
         let mut layer = Self::empty();
 
         layer.init_layers(backend, &config.clone());
@@ -57,10 +58,10 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
     /// to be executed for each tensor and layer.
     ///
     /// [1]: ./struct.SequentialConfig.html
-    pub fn init_layers(&mut self, backend: Rc<B>, in_config: &SequentialConfig) {
+    pub fn init_layers(&mut self, backend: Rc<LeafBackend>, in_config: &SequentialConfig) {
         let mut config = in_config.clone();
-        let mut registry = HashMap::<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>)>::new();
-        let weight_registry = &mut HashMap::<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>, Option<f32>, Option<f32>)>::new();
+        let mut registry = HashMap::<String, ArcLockTensorBlob>::new();
+        let weight_registry = &mut HashMap::<String, WeightArcLockTensorBlob>::new();
 
         for (input_name, input_shape) in config.inputs.clone() {
             self.init_input_blob(backend.clone(), &input_name, &input_shape, &mut registry);
@@ -144,10 +145,10 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
     /// [1]: ../layer/struct.Layer.html
     /// [2]: ../layer/struct.Layer.html#method.connect
     fn init_input_blob(&mut self,
-                  backend: Rc<B>,
+                  backend: Rc<LeafBackend>,
                   tensor_name: &str,
                   input_shape: &[usize],
-                  registry: &mut HashMap<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>)> ) {
+                  registry: &mut HashMap<String, ArcLockTensorBlob> ) {
 
         if registry.contains_key(tensor_name) {
             // If we are not doing in-place computation but see two layers trying
@@ -157,9 +158,8 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
         } else {
             info!("Input {} -> {}", self.input_data_tensors.len(), tensor_name);
 
-            let ibackend: Rc<IBackend<F=B::F>> = backend;
-            let data_tensor: ArcLock<SharedTensor<f32>> = Arc::new(RwLock::new(SharedTensor::new(ibackend.device(), &input_shape).unwrap()));
-            let gradient_tensor: ArcLock<SharedTensor<f32>> = Arc::new(RwLock::new(SharedTensor::new(ibackend.device(), &input_shape).unwrap()));
+            let data_tensor: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from(input_shape)));
+            let gradient_tensor: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from(input_shape)));
 
             self.input_data_tensors.push(data_tensor.clone());
             self.input_gradient_tensors.push(gradient_tensor.clone());
@@ -177,10 +177,10 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
     /// [3]: ../layer/struct.Layer.html
     /// [4]: ../layers/index.html
     fn init_layer(&mut self,
-                  backend: Rc<B>,
+                  backend: Rc<LeafBackend>,
                   layer_config: &LayerConfig,
-                  registry: &mut HashMap<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>)>,
-                  weight_registry: &mut HashMap<String, (ArcLock<SharedTensor<f32>>, ArcLock<SharedTensor<f32>>, Option<f32>, Option<f32>)>) {
+                  registry: &mut HashMap<String, ArcLockTensorBlob>,
+                  weight_registry: &mut HashMap<String, WeightArcLockTensorBlob>) {
         // Setup layer.
         if let Err(e) = layer_config.validate() {
             error!("{}", e);
@@ -196,33 +196,33 @@ impl<B: IBackend + LayerOps<f32> + 'static> Sequential<B> {
     }
 }
 
-impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
+impl ILayer for Sequential {
     fn is_container(&self) -> bool {
         true
     }
 
-    fn inputs_data(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn inputs_data(&self) -> Option<Vec<ArcLockTensor>> {
         Some(self.input_data_tensors.clone())
     }
 
-    fn inputs_gradients(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn inputs_gradients(&self) -> Option<Vec<ArcLockTensor>> {
         Some(self.input_gradient_tensors.clone())
     }
 
-    fn outputs_data(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn outputs_data(&self) -> Option<Vec<ArcLockTensor>> {
         Some(self.output_data_tensors.clone())
     }
 
-    fn outputs_gradients(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn outputs_gradients(&self) -> Option<Vec<ArcLockTensor>> {
         Some(self.output_gradient_tensors.clone())
     }
 
-    fn learnable_weights(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn learnable_weights(&self) -> Option<Vec<ArcLockTensor>> {
         let weights = self.layers.iter().flat_map(|layer| layer.borrow().learnable_weights_data()).collect();
         Some(weights)
     }
 
-    fn learnable_weights_gradients(&self) -> Option<Vec<ArcLock<SharedTensor<f32>>>> {
+    fn learnable_weights_gradients(&self) -> Option<Vec<ArcLockTensor>> {
         let gradients = self.layers.iter().flat_map(|layer| layer.borrow().learnable_weights_gradients()).collect();
         Some(gradients)
     }
@@ -232,7 +232,7 @@ impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
         Some(names)
     }
 
-    fn resize_shared_workspace(&mut self, backend: Rc<B>, workspace: Option<ArcLock<SharedTensor<u8>>>) -> Option<ArcLock<SharedTensor<u8>>> {
+    fn resize_shared_workspace(&mut self, backend: Rc<LeafBackend>, workspace: Option<ArcLockTensor<u8>>) -> Option<ArcLockTensor<u8>> {
         debug!("Resizing shared workspace {:?}", workspace.is_some());
         let mut shared_workspace = workspace;
 
@@ -244,10 +244,10 @@ impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
     }
 
     fn forward(&self,
-               backend: &B,
-               input_data: &[ArcLock<SharedTensor<f32>>],
-               weights_data: &[ArcLock<SharedTensor<f32>>],
-               output_data: &mut [ArcLock<SharedTensor<f32>>]) {
+               backend: &LeafBackend,
+               input_data: &[ArcLockTensor],
+               weights_data: &[ArcLockTensor],
+               output_data: &mut [ArcLockTensor]) {
         for layer in &self.layers {
             for (i, (input, input_name)) in input_data.iter().zip(self.input_tensor_names.iter()).enumerate() {
                 if &layer.borrow().input_blob_names[i] == input_name {
@@ -262,12 +262,12 @@ impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
     }
 
     fn backward_input(&self,
-                backend: &B,
-                weights_data: &[ArcLock<SharedTensor<f32>>],
-                output_data: &[ArcLock<SharedTensor<f32>>],
-                output_gradients: &[ArcLock<SharedTensor<f32>>],
-                input_data: &[ArcLock<SharedTensor<f32>>],
-                input_gradients: &mut [ArcLock<SharedTensor<f32>>]) {
+                backend: &LeafBackend,
+                weights_data: &[ArcLockTensor],
+                output_data: &[ArcLockTensor],
+                output_gradients: &[ArcLockTensor],
+                input_data: &[ArcLockTensor],
+                input_gradients: &mut [ArcLockTensor]) {
         if let Some(last_layer) = self.layers.last() {
             for (i, output_gradient) in output_gradients.iter().enumerate() {
                 last_layer.borrow_mut().output_blobs_gradient[i] = output_gradient.clone();
@@ -282,11 +282,11 @@ impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
     }
 
     fn backward_parameters(&self,
-                backend: &B,
-                output_data: &[ArcLock<SharedTensor<f32>>],
-                output_gradients: &[ArcLock<SharedTensor<f32>>],
-                input_data: &[ArcLock<SharedTensor<f32>>],
-                weights_gradients: &mut [ArcLock<SharedTensor<f32>>]) {
+                backend: &LeafBackend,
+                output_data: &[ArcLockTensor],
+                output_gradients: &[ArcLockTensor],
+                input_data: &[ArcLockTensor],
+                weights_gradients: &mut [ArcLockTensor]) {
         for layer in self.layers.iter().rev() {
             layer.borrow_mut().backward_parameters();
         }
@@ -296,19 +296,19 @@ impl<B: IBackend + LayerOps<f32> + 'static> ILayer<B> for Sequential<B> {
     }
 }
 
-impl<B: IBackend + LayerOps<f32> + 'static> ComputeOutput<f32, B> for Sequential<B> {
+impl ComputeOutput<f32> for Sequential {
     // we are overriding `forward` and not calling `compute_output`
     fn compute_output(&self,
-                      backend: &B,
+                      backend: &LeafBackend,
                       weights: &[&SharedTensor<f32>],
                       input_data: &[&SharedTensor<f32>],
                       output_data: &mut [&mut SharedTensor<f32>]) { }
 }
 
-impl<B: IBackend + LayerOps<f32> + 'static> ComputeInputGradient<f32, B> for Sequential<B> {
+impl ComputeInputGradient<f32> for Sequential {
     // we are overriding `backward_input` and not calling `compute_input_gradient`
     fn compute_input_gradient(&self,
-                              backend: &B,
+                              backend: &LeafBackend,
                               weights_data: &[&SharedTensor<f32>],
                               output_data: &[&SharedTensor<f32>],
                               output_gradients: &[&SharedTensor<f32>],
@@ -316,10 +316,10 @@ impl<B: IBackend + LayerOps<f32> + 'static> ComputeInputGradient<f32, B> for Seq
                               input_gradients: &mut [&mut SharedTensor<f32>]) { }
 }
 
-impl<B: IBackend + LayerOps<f32> + 'static> ComputeParametersGradient<f32, B> for Sequential<B> {
+impl ComputeParametersGradient<f32> for Sequential {
     // we are overriding `backward_parameters` and not calling `compute_parameters_gradient`
     fn compute_parameters_gradient(&self,
-                                   backend: &B,
+                                   backend: &LeafBackend,
                                    output_data: &[&SharedTensor<f32>],
                                    output_gradients: &[&SharedTensor<f32>],
                                    input_data: &[&SharedTensor<f32>],

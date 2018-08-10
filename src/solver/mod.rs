@@ -9,35 +9,34 @@ pub use self::confusion_matrix::ConfusionMatrix;
 
 use std::rc::Rc;
 use std::marker::PhantomData;
-use co::prelude::*;
 use layer::*;
 use layers::SequentialConfig;
 use solvers::*;
-use util::{ArcLock, LayerOps, SolverOps};
+
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug)]
 /// Solver that optimizes a [Layer][1] with a given objective.
 /// [1]: ../layer/index.html
-pub struct Solver<SolverB: IBackend + SolverOps<f32>, B: IBackend + LayerOps<f32>> {
-    net: Layer<B>,
-    objective: Layer<SolverB>,
+pub struct Solver {
+    net: Layer,
+    objective: Layer,
     /// The implementation of the Solver
-    pub worker: Box<ISolver<SolverB, B>>,
+    pub worker: Box<ISolver>,
 
     config: SolverConfig,
 
     /// The current iteration / number of times weights have been updated
     iter: usize,
-
-    solver_backend: PhantomData<SolverB>,
 }
 
-impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> + 'static> Solver<SolverB, B> {
+impl Solver {
     /// Create Solver from [SolverConfig][1]
     /// [1]: ./struct.SolverConfig.html
     ///
     /// This is the **preferred method** to create a Solver for training a neural network.
-    pub fn from_config(net_backend: Rc<B>, obj_backend: Rc<SolverB>, config: &SolverConfig) -> Solver<SolverB, B> {
+    pub fn from_config(net_backend: Rc<LeafBackend>, obj_backend: Rc<LeafBackend>, config: &SolverConfig) -> Solver {
         let network = Layer::from_config(net_backend, &config.network);
         let mut worker = config.solver.with_config(obj_backend.clone(), &config);
         worker.init(&network);
@@ -49,14 +48,13 @@ impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> +
             iter: 0,
 
             config: config.clone(),
-            solver_backend: PhantomData::<SolverB>,
         }
     }
 
 }
 
-impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> + 'static> Solver<SolverB, B>{
-    fn init(&mut self, backend: Rc<B>) {
+impl Solver {
+    fn init(&mut self, backend: Rc<LeafBackend>) {
         info!("Initializing solver from configuration");
 
         let mut config = self.config.clone();
@@ -64,12 +62,12 @@ impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> +
     }
 
     /// Initialize the training net
-    fn init_net(&mut self, backend: Rc<B>, param: &mut SolverConfig) {
+    fn init_net(&mut self, backend: Rc<LeafBackend>, param: &mut SolverConfig) {
         self.net = Layer::from_config(backend, &param.network);
     }
 
     /// Train the network with one minibatch
-    pub fn train_minibatch(&mut self, mb_data: ArcLock<SharedTensor<f32>>, mb_target: ArcLock<SharedTensor<f32>>) -> ArcLock<SharedTensor<f32>> {
+    pub fn train_minibatch(&mut self, mb_data: ArcLockTensor, mb_target: ArcLockTensor) -> ArcLockTensor {
         // forward through network and classifier
         let network_out = self.net.forward(&[mb_data])[0].clone();
         let _ = self.objective.forward(&[network_out.clone(), mb_target]);
@@ -88,7 +86,7 @@ impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> +
     /// Returns the network trained by the solver.
     ///
     /// This is the recommended method to get a usable trained network.
-    pub fn network(&self) -> &Layer<B> {
+    pub fn network(&self) -> &Layer {
         &self.net
     }
 
@@ -98,7 +96,7 @@ impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> +
     /// if you want to alter the network. Keep in mind that altering the network
     /// might render the solver unusable and continuing training the network with it will yield
     /// unexpected results.
-    pub fn mut_network(&mut self) -> &mut Layer<B> {
+    pub fn mut_network(&mut self) -> &mut Layer {
         &mut self.net
     }
 }
@@ -107,9 +105,9 @@ impl<SolverB: IBackend + SolverOps<f32> + 'static, B: IBackend + LayerOps<f32> +
 ///
 /// See [Solvers][1]
 /// [1]: ../solvers/index.html
-pub trait ISolver<SolverB, B: IBackend + LayerOps<f32>> {
+pub trait ISolver {
     /// Initialize the solver, setting up any network related data.
-    fn init(&mut self, net: &Layer<B>) {}
+    fn init(&mut self, net: &Layer) {}
 
     /// Update the weights of the net with part of the gradient.
     ///
@@ -122,13 +120,13 @@ pub trait ISolver<SolverB, B: IBackend + LayerOps<f32>> {
     /// Used by [step][2] to optimize the network.
     ///
     /// [2]: ./struct.Solver.html#method.step
-    fn compute_update(&mut self, param: &SolverConfig, network: &mut Layer<B>, iter: usize);
+    fn compute_update(&mut self, param: &SolverConfig, network: &mut Layer, iter: usize);
 
     /// Returns the backend used by the solver.
-    fn backend(&self) -> &SolverB;
+    fn backend(&self) -> &LeafBackend;
 }
 
-impl<SolverB, B: IBackend + LayerOps<f32>> ::std::fmt::Debug for ISolver<SolverB, B> {
+impl ::std::fmt::Debug for ISolver {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "({})", "ILayer")
     }
@@ -337,7 +335,7 @@ pub enum SolverKind {
 
 impl SolverKind {
     /// Create a Solver of the specified kind with the supplied SolverConfig.
-    pub fn with_config<B: IBackend + SolverOps<f32> + 'static, NetB: IBackend + LayerOps<f32> + 'static>(&self, backend: Rc<B>, config: &SolverConfig) -> Box<ISolver<B, NetB>> {
+    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<ISolver> {
         match *self {
             SolverKind::SGD(sgd) => {
                 sgd.with_config(backend, config)
@@ -356,10 +354,10 @@ pub enum SGDKind {
 
 impl SGDKind {
     /// Create a Solver of the specified kind with the supplied SolverConfig.
-    pub fn with_config<B: IBackend + SolverOps<f32> + 'static, NetB: IBackend + LayerOps<f32> + 'static>(&self, backend: Rc<B>, config: &SolverConfig) -> Box<ISolver<B, NetB>> {
+    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<ISolver> {
         match *self {
             SGDKind::Momentum => {
-                Box::new(Momentum::<B>::new(backend))
+                Box::new(Momentum::new(backend))
             }
         }
     }
