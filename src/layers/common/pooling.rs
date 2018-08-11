@@ -18,7 +18,8 @@ use util::{ArcLock, cast_vec_usize_to_i32};
 use super::FilterLayer;
 use leaf_capnp::pooling_config as capnp_config;
 use leaf_capnp::PoolingMode as CapnpPoolingMode;
-use capnp_util::*;
+
+use crate::utilities::cerealization_protocol::*;
 
 #[derive(Debug, Clone)]
 /// [Pooling](./index.html) Layer

@@ -29,12 +29,14 @@
 
 #[allow(unused_import_braces)]
 pub use self::sgd::Momentum;
+pub mod core;
 pub mod sgd;
 
-use solver::*;
-use layer::*;
-
+use crate::layers::core::*;
+use crate::layers::SequentialConfig;
+use crate::solvers::core::*;
 use crate::typedefs::ArcLockTensor;
+
 use parenchyma::prelude::SharedTensor;
 
 trait SGDSolver : SolverWorker {

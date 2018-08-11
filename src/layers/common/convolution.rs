@@ -21,7 +21,8 @@ use util::{ArcLock, cast_vec_usize_to_i32};
 use weight::FillerType;
 use super::FilterLayer;
 use leaf_capnp::convolution_config as capnp_config;
-use capnp_util::*;
+
+use crate::cerealization_protocol::*;
 
 #[derive(Debug, Clone)]
 /// Convolution Layer

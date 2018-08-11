@@ -18,15 +18,16 @@
 //!
 //! In the context of convolutional neural networks this layer is also
 //! called a "fully-connected layer" if it is used at the end of the network.
-use std::rc::Rc;
-use layer::*;
-use weight::FillerType;
-use leaf_capnp::linear_config as capnp_config;
-use capnp_util::*;
 
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::linear_config as capnp_config;
+use crate::layers::core::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
+use crate::weight::FillerType;
+
 use parenchyma::prelude::SharedTensor;
 use parenchyma_blas::Transposition;
+use std::rc::Rc;
 
 #[derive(Debug)]
 /// Linear Layer

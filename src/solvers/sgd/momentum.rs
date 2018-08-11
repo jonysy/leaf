@@ -13,20 +13,20 @@
 //! into the same direction you will reach the optimum faster.
 //! It also makes solving more stable.
 
-use layer::*;
-use solver::*;
-use solvers::SGDSolver;
+use crate::layers::core::*;
+use crate::solvers::core::*;
+use crate::solvers::SGDSolver;
+use crate::typedefs::{ArcLockTensor, LeafBackend};
+
+use parenchyma::prelude::SharedTensor;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use crate::typedefs::{ArcLockTensor, LeafBackend};
-use parenchyma::prelude::SharedTensor;
-
-#[derive(Debug)]
 /// Stochastic Gradient Descent with Momentum.
 ///
 /// See [module description][1] for more information.
 /// [1]: ./index.html
+#[derive(Debug)]
 pub struct Momentum {
     /// The gradient update from the previous iteration for each blob.
     history: Vec<ArcLockTensor>,

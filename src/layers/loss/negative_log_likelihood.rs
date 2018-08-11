@@ -1,16 +1,16 @@
 //! TODO: DOC
 //!
 
-use layer::*;
-use leaf_capnp::negative_log_likelihood_config as capnp_config;
-use capnp_util::*;
-
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::negative_log_likelihood_config as capnp_config;
+use crate::layers::core::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
+
 use parenchyma::prelude::SharedTensor;
 
-#[derive(Debug, Clone)]
-#[allow(missing_copy_implementations)]
 /// NegativeLogLikelihood Loss Layer
+#[allow(missing_copy_implementations)]
+#[derive(Debug, Clone)]
 pub struct NegativeLogLikelihood {
     num_classes: usize,
 }

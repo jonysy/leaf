@@ -1,10 +1,7 @@
 //! Provides configuration of weights and their initialization.
 
-// use util::native_backend;
-
-
-use crate::capnp_util::*;
-use crate::leaf_capnp::weight_config as capnp_config;
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::weight_config as capnp_config;
 use parenchyma::prelude::SharedTensor;
 use rand;
 use rand::distributions::{Distribution, Range};

@@ -2,25 +2,26 @@
 //!
 //! See [Layers][layers]
 //! [layers]: ../layers/index.html
-use layers::*;
-use weight::WeightConfig;
+
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::layer as capnp_layer;
+use crate::cerealization_protocol::layer_config as capnp_layer_config;
+use crate::cerealization_protocol::layer_config::layer_type as capnp_layer_type;
+use crate::layers::*;
+use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
+use crate::weight::WeightConfig;
+
+use parenchyma::prelude::SharedTensor;
+use std::{cmp, fmt};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufReader};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use leaf_capnp::layer as capnp_layer;
-use leaf_capnp::layer_config as capnp_layer_config;
-use leaf_capnp::layer_config::layer_type as capnp_layer_type;
-use capnp_util::*;
 
-use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
-use parenchyma::prelude::SharedTensor;
-use std::{cmp, fmt};
-
-#[derive(Debug)]
 /// The generic Layer
+#[derive(Debug)]
 pub struct Layer {
     /// Identifies the Network
     ///
@@ -615,7 +616,9 @@ impl Layer {
     ///
     /// You can find the capnp schema [here](../../../../capnp/leaf.capnp).
     ///
-    /// ```
+    /// TODO:
+    ///
+    /// ```ignore
     /// # extern crate leaf;
     /// # extern crate collenchyma;
     /// # #[cfg(feature = "native")]

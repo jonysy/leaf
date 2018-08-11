@@ -7,16 +7,15 @@ pub mod confusion_matrix;
 
 pub use self::confusion_matrix::ConfusionMatrix;
 
-use std::rc::Rc;
-use layer::*;
-use layers::SequentialConfig;
-use solvers::*;
-
+use crate::layers::core::*;
+use crate::solvers::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
 
-#[derive(Debug)]
+use std::rc::Rc;
+
 /// Solver that optimizes a [Layer][1] with a given objective.
 /// [1]: ../layer/index.html
+#[derive(Debug)]
 pub struct Solver {
     net: Layer,
     objective: Layer,

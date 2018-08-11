@@ -52,11 +52,7 @@
 /// [1]: ./layer/trait.ILayer.html
 /// [2]: ./layers/activation/index.html
 
-pub use self::activation::{
-    ReLU,
-    Sigmoid,
-    TanH,
-};
+pub use self::activation::{ReLU, Sigmoid, TanH};
 
 #[cfg(all(feature="cuda", not(feature="native")))]
 pub use self::common::{
@@ -85,6 +81,7 @@ pub use self::container::{
 
 pub mod activation;
 pub mod common;
+pub mod core;
 pub mod loss;
 pub mod utility;
 pub mod container;

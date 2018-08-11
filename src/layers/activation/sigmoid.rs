@@ -7,49 +7,24 @@
 //!
 //! ReLu, compared to Sigmoid
 //!
-//! * reduces the likelyhood of vanishing gradients
-//! * increases the likelyhood of a more beneficial sparse representation
+//! * reduces the likelihood of vanishing gradients
+//! * increases the likelihood of a more beneficial sparse representation
 //! * can be computed faster
 //! * is therefore the most popular activation function in DNNs as of this
 //! writing (2015).
 
-use layer::*;
+use crate::layers::core::{ComputeInputGradient, ComputeOutput, ComputeParametersGradient};
+use crate::typedefs::LeafBackend;
 
-use crate::typedefs::{ArcLockTensor, LeafBackend};
 use parenchyma::prelude::SharedTensor;
 
-#[derive(Debug, Clone)]
-#[allow(missing_copy_implementations)]
 /// Sigmoid Activation Layer
+#[allow(missing_copy_implementations)]
+#[derive(Debug, Clone)]
 pub struct Sigmoid;
 
-//
-// Sigmoid + SigmoidPointwise
-// Only on CUDA
-//
-// Sigmoid without SigmoidPointwise
-// Only on Native
-//
-impl LayerWorker for Sigmoid {
-    impl_ilayer_activation!();
-
-    fn reshape(&mut self,
-        backend: ::std::rc::Rc<LeafBackend>,
-        input_data: &mut Vec<ArcLockTensor>,
-        input_gradient: &mut Vec<ArcLockTensor>,
-        weights_data: &mut Vec<ArcLockTensor>,
-        weights_gradient: &mut Vec<ArcLockTensor>,
-        output_data: &mut Vec<ArcLockTensor>,
-        output_gradient: &mut Vec<ArcLockTensor>) {
-
-        if let Some(inp) = input_data.get(0) {
-            let read_inp = inp.read().unwrap();
-            let input_desc = read_inp.shape();
-            input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-        }
-    }
+impl super::ActivationLayer for Sigmoid {
+    // ..
 }
 
 impl ComputeOutput<f32> for Sigmoid {
@@ -61,6 +36,7 @@ impl ComputeOutput<f32> for Sigmoid {
 
         match input_data.get(0) {
             Some(input) => backend.sigmoid(input, output_data[0]).unwrap(),
+            
             None => {
                 panic!("No input provided for Sigmoid layer.")
                 // TODO
@@ -80,7 +56,11 @@ impl ComputeInputGradient<f32> for Sigmoid {
         input_gradients: &mut [&mut SharedTensor<f32>]) {
 
         match output_data.get(0) {
-            Some(_) => backend.sigmoid_grad(output_data[0], output_gradients[0], input_data[0], input_gradients[0]).unwrap(),
+            Some(_) => {
+                backend.sigmoid_grad(
+                    output_data[0], output_gradients[0], input_data[0], input_gradients[0]).unwrap()
+            }
+
             None => {
                 panic!("No output_data provided for Sigmoid layer backward.")
                 // TODO
@@ -90,4 +70,6 @@ impl ComputeInputGradient<f32> for Sigmoid {
     }
 }
 
-impl ComputeParametersGradient<f32> for Sigmoid {}
+impl ComputeParametersGradient<f32> for Sigmoid {
+    // ..
+}

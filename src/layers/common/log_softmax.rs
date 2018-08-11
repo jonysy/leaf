@@ -1,8 +1,7 @@
 //! Computes the logarithmic softmax of its input.
 //!
 
-use layer::*;
-
+use crate::layers::core::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
 use parenchyma::prelude::SharedTensor;
 

@@ -16,15 +16,15 @@
 //! - `H` : height
 //! - `W` : width
 
-use layer::*;
-use leaf_capnp::reshape_config as capnp_config;
-use capnp_util::*;
-
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::reshape_config as capnp_config;
+use crate::layers::core::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
+
 use parenchyma::prelude::SharedTensor;
 
-#[derive(Debug, Clone)]
 /// Reshape Utility Layer
+#[derive(Clone, Debug)]
 pub struct Reshape{
     shape: Vec<usize>,
 }

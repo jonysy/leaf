@@ -2,8 +2,7 @@
 //!
 //! For the logarithmic softmax see the `LogSoftmax` layer.
 
-use layer::*;
-
+use crate::layers::core::*;
 use crate::typedefs::{ArcLockTensor, LeafBackend};
 use parenchyma::prelude::SharedTensor;
 

@@ -2,47 +2,22 @@
 //!
 //! Non-linearity activation function: y = max(0, x)
 //!
-//! This is generally the preferred choice over Sigmod or TanH.
+//! This is generally the preferred choice over Sigmoid or TanH.
 //! The max function used in ReLU is usually faster to compute than the exponentiation
 //! needed in a Sigmoid layer.
 
-use layer::*;
+use crate::layers::core::{ComputeInputGradient, ComputeOutput, ComputeParametersGradient};
+use crate::typedefs::LeafBackend;
 
-use crate::typedefs::{ArcLockTensor, LeafBackend};
 use parenchyma::prelude::SharedTensor;
 
-#[derive(Debug, Clone)]
-#[allow(missing_copy_implementations)]
 /// ReLU Activation Layer
+#[allow(missing_copy_implementations)]
+#[derive(Debug, Clone)]
 pub struct ReLU;
 
-//
-// ReLU + ReLUPointwise
-// Only on CUDA
-//
-// ReLU without ReLUPointwise
-// Only on Native
-//
-impl LayerWorker for ReLU {
-    impl_ilayer_activation!();
-
-    fn reshape(&mut self,
-        backend: ::std::rc::Rc<LeafBackend>,
-        input_data: &mut Vec<ArcLockTensor>,
-        input_gradient: &mut Vec<ArcLockTensor>,
-        weights_data: &mut Vec<ArcLockTensor>,
-        weights_gradient: &mut Vec<ArcLockTensor>,
-        output_data: &mut Vec<ArcLockTensor>,
-        output_gradient: &mut Vec<ArcLockTensor>) {
-
-        if let Some(inp) = input_data.get(0) {
-            let read_inp = inp.read().unwrap();
-            let input_desc = read_inp.shape();
-            input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-        }
-    }
+impl super::ActivationLayer for ReLU {
+    // ..
 }
 
 impl ComputeOutput<f32> for ReLU {
@@ -53,9 +28,8 @@ impl ComputeOutput<f32> for ReLU {
         output_data: &mut [&mut SharedTensor<f32>]) {
 
         match input_data.get(0) {
-            Some(input) => {
-                backend.relu(input, output_data[0]).unwrap()
-            }
+            Some(input) => backend.relu(input, output_data[0]).unwrap(),
+
             None => {
                 panic!("No input provided for ReLU layer.")
                 // TODO
@@ -92,4 +66,6 @@ impl ComputeInputGradient<f32> for ReLU {
     }
 }
 
-impl ComputeParametersGradient<f32> for ReLU {}
+impl ComputeParametersGradient<f32> for ReLU {
+    // ..
+}

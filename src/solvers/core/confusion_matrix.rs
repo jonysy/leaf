@@ -1,9 +1,8 @@
 //! TODO: DOC
 
+use parenchyma::prelude::SharedTensor;
 use std::collections::VecDeque;
 use std::fmt;
-
-use parenchyma::prelude::SharedTensor;
 
 /// A [ConfusionMatrix][wiki].
 ///

@@ -1,17 +1,19 @@
 //! A container layer that runs operations sequentially on the contained layers.
+
+use crate::layers::core::*;
+use crate::cerealization_protocol::*;
+use crate::cerealization_protocol::sequential_config as capnp_config;
+use crate::cerealization_protocol::shaped_input as capnp_shaped_input;
+use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
+
+use parenchyma::prelude::SharedTensor;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use layer::*;
-use leaf_capnp::sequential_config as capnp_config;
-use leaf_capnp::shaped_input as capnp_shaped_input;
-use capnp_util::*;
 
-use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
-use parenchyma::prelude::SharedTensor;
-
-#[derive(Debug)] /// Sequential Layer
+/// Sequential Layer
+#[derive(Debug)]
 pub struct Sequential {
     layers: Vec<RefCell<Layer>>,
 
