@@ -30,7 +30,7 @@ pub struct Sigmoid;
 // Sigmoid without SigmoidPointwise
 // Only on Native
 //
-impl ILayer for Sigmoid {
+impl LayerWorker for Sigmoid {
     impl_ilayer_activation!();
 
     fn reshape(&mut self,

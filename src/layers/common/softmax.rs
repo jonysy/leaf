@@ -12,7 +12,7 @@ use parenchyma::prelude::SharedTensor;
 /// Softmax Layer
 pub struct Softmax;
 
-impl ILayer for Softmax {
+impl LayerWorker for Softmax {
     fn reshape(&mut self,
                backend: ::std::rc::Rc<LeafBackend>,
                input_data: &mut Vec<ArcLockTensor>,

@@ -86,7 +86,7 @@ impl<T, B: conn::Pooling<T>> FilterLayer for Pooling<T, B> {
     }
 }
 
-impl<B: IBackend + conn::Pooling<f32>> ILayer<B> for Pooling<f32, B> {
+impl<B: IBackend + conn::Pooling<f32>> LayerWorker<B> for Pooling<f32, B> {
     impl_ilayer_common!();
 
     fn reshape(&mut self,

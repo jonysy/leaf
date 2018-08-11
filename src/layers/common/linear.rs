@@ -67,7 +67,7 @@ impl Linear {
     }
 }
 
-impl ILayer for Linear {
+impl LayerWorker for Linear {
     impl_ilayer_common!();
 
     fn auto_weight_blobs(&self) -> bool {

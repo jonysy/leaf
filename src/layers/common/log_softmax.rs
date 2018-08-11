@@ -11,7 +11,7 @@ use parenchyma::prelude::SharedTensor;
 /// LogSoftmax Layer
 pub struct LogSoftmax;
 
-impl ILayer for LogSoftmax {
+impl LayerWorker for LogSoftmax {
     fn reshape(&mut self,
                backend: ::std::rc::Rc<LeafBackend>,
                input_data: &mut Vec<ArcLockTensor>,

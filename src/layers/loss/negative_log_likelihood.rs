@@ -40,7 +40,7 @@ impl NegativeLogLikelihood {
     }
 }
 
-impl ILayer for NegativeLogLikelihood {
+impl LayerWorker for NegativeLogLikelihood {
     impl_ilayer_loss!();
 
     fn sync_native(&self) -> bool {

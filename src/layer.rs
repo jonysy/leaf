@@ -32,14 +32,14 @@ pub struct Layer {
     /// [1]: ../layers/index.html
     ///
     /// This is the part that does most of the work ([forward][2]/[backward][3]).
-    /// [2]: ./trait.ILayer.html#method.forward
-    /// [3]: ./trait.ILayer.html#method.backward
-    pub worker: Box<ILayer>,
+    /// [2]: ./trait.LayerWorker.html#method.forward
+    /// [3]: ./trait.LayerWorker.html#method.backward
+    pub worker: Box<LayerWorker>,
 
     backend: Rc<LeafBackend>,
 
     /// Determines if layer will skip comutations for [backward][1] step.
-    /// [1]: ./trait.ILayer.html#method.backward
+    /// [1]: ./trait.LayerWorker.html#method.backward
     needs_backward: bool,
 
     /// The vector that stores shared references to the weights in the form of blobs.
@@ -96,7 +96,7 @@ impl Layer {
     /// layers can connect them as their inputs.
     /// In the end it initializes the underlying [layer implementation][2].
     ///
-    /// [2]: ./trait.ILayer.html
+    /// [2]: ./trait.LayerWorker.html
     ///
     /// Called during initialization of containter layers.
     pub fn connect(
@@ -226,8 +226,8 @@ impl Layer {
     /// [Layer implementations][2] may request creation of anonymous output blobs
     /// via [auto_output_blobs][3]. Since the blobs are not named, other layers can
     /// not use them as their input blobs.
-    /// [2]: ./trait.ILayer.html
-    /// [3]: ./trait.ILayer.html#method.auto_output_blobs
+    /// [2]: ./trait.LayerWorker.html
+    /// [3]: ./trait.LayerWorker.html#method.auto_output_blobs
     fn create_anonymous_output(&mut self) {
         let blob_name = "(automatic)".to_owned();
 
@@ -446,7 +446,7 @@ impl Layer {
 
     /// Uses the underlying layer implementation to compute a forward step.
     ///
-    /// See [ILayer.forward](./trait.ILayer.html#method.forward)
+    /// See [LayerWorker.forward](./trait.LayerWorker.html#method.forward)
     pub fn forward(&mut self, inputs: &[ArcLockTensor]) -> Vec<ArcLockTensor> {
         debug!("LAYER: {:?}", &self.name);
         for (input_i, input) in inputs.iter().enumerate() {
@@ -473,7 +473,7 @@ impl Layer {
 
     /// Uses the underlying layer implementation to compute a backward step.
     ///
-    /// See [ILayer.backward](./trait.ILayer.html#method.backward)
+    /// See [LayerWorker.backward](./trait.LayerWorker.html#method.backward)
     pub fn backward(&mut self, output_gradients: &[ArcLockTensor]) -> Vec<ArcLockTensor> {
         if self.needs_backward {
             let input_gradients = self.backward_input(output_gradients);
@@ -859,7 +859,7 @@ impl Layer {
     /// [1]: #method.from_config
     /// [2]: ./enum.LayerType.html
     /// [3]: ../layers/index.html
-    fn worker_from_config(backend: Rc<LeafBackend>, config: &LayerConfig) -> Box<ILayer> {
+    fn worker_from_config(backend: Rc<LeafBackend>, config: &LayerConfig) -> Box<LayerWorker> {
         match config.layer_type.clone() {
             #[cfg(all(feature="cuda", not(feature="native")))]
             LayerType::Convolution(layer_config) => Box::new(Convolution::from_config(&layer_config)),
@@ -878,7 +878,7 @@ impl Layer {
 }
 
 /// A Layer in a Neural Network that can handle forward and backward of a computation step.
-pub trait ILayer : ComputeOutput<f32> + ComputeInputGradient<f32> + ComputeParametersGradient<f32> {
+pub trait LayerWorker : ComputeOutput<f32> + ComputeInputGradient<f32> + ComputeParametersGradient<f32> {
     /// Initialize the layer for computation.
     ///
     /// Allows for layer-specific one time setup, e.g. precomputing constant values.
@@ -1185,9 +1185,9 @@ pub trait ComputeParametersGradient<T> {
                                    parameters_gradients: &mut [&mut SharedTensor<T>]) {}
 }
 
-impl fmt::Debug for ILayer {
+impl fmt::Debug for LayerWorker {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({})", "ILayer")
+        write!(f, "({})", "LayerWorker")
     }
 }
 

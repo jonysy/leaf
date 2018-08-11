@@ -23,7 +23,7 @@ pub struct ReLU;
 // ReLU without ReLUPointwise
 // Only on Native
 //
-impl ILayer for ReLU {
+impl LayerWorker for ReLU {
     impl_ilayer_activation!();
 
     fn reshape(&mut self,

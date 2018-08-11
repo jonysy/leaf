@@ -196,7 +196,7 @@ impl Sequential {
     }
 }
 
-impl ILayer for Sequential {
+impl LayerWorker for Sequential {
     fn is_container(&self) -> bool {
         true
     }

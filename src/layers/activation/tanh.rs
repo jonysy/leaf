@@ -28,7 +28,7 @@ pub struct TanH;
 // Tanh without TanhPointwise
 // Only on Native
 //
-impl ILayer for TanH {
+impl LayerWorker for TanH {
     impl_ilayer_activation!();
 
     fn reshape(&mut self,

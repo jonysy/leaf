@@ -38,7 +38,7 @@ impl Reshape {
     }
 }
 
-impl ILayer for Reshape {
+impl LayerWorker for Reshape {
     fn compute_in_place(&self) -> bool {
         true
     }
