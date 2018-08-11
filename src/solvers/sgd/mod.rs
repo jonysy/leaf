@@ -1,4 +1,4 @@
-//! Provides ISolver implementations based on [Stochastic Gradient
+//! Provides SolverWorker implementations based on [Stochastic Gradient
 //! Descent][2].
 //! [2]: https://en.wikipedia.org/wiki/Stochastic_gradient_descent
 //!
@@ -18,13 +18,13 @@
 //! [backprop]: https://en.wikipedia.org/wiki/Backpropagation
 //! [gd]: https://en.wikipedia.org/wiki/Gradient_descent
 
-/// Implement [ISolver][1] for [SGD solvers][2].
-/// [1]: ./solver/trait.ISolver.html
+/// Implement [SolverWorker][1] for [SGD solvers][2].
+/// [1]: ./solver/trait.SolverWorker.html
 /// [2]: ./solvers/sgd/index.html
 #[macro_export]
 macro_rules! impl_isolver_sgd {
     ($t:ty) => (
-        impl ISolver for $t {
+        impl SolverWorker for $t {
             /// Initialize the SGD Momentum solver, allocating memory for its history.
             fn init(&mut self, net: &Layer) {
                 self.history = Vec::with_capacity(net.learnable_weights_gradients().len());

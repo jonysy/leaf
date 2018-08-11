@@ -37,7 +37,7 @@ use layer::*;
 use crate::typedefs::ArcLockTensor;
 use parenchyma::prelude::SharedTensor;
 
-trait SGDSolver : ISolver {
+trait SGDSolver : SolverWorker {
     fn compute_update_value(&mut self,
                             config: &SolverConfig,
                             weight_blob: &ArcLockTensor,

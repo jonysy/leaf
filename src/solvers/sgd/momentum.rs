@@ -78,7 +78,7 @@ impl SGDSolver for Momentum {
             value: config.momentum
         }.fill(&mut self.momentum);
 
-        let backend = ISolver::backend(self);
+        let backend = SolverWorker::backend(self);
 
         let history_blob = &self.history[history_blob_id];
 

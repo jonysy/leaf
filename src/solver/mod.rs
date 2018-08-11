@@ -21,7 +21,7 @@ pub struct Solver {
     net: Layer,
     objective: Layer,
     /// The implementation of the Solver
-    pub worker: Box<ISolver>,
+    pub worker: Box<SolverWorker>,
 
     config: SolverConfig,
 
@@ -103,7 +103,7 @@ impl Solver {
 ///
 /// See [Solvers][1]
 /// [1]: ../solvers/index.html
-pub trait ISolver {
+pub trait SolverWorker {
     /// Initialize the solver, setting up any network related data.
     fn init(&mut self, net: &Layer) {}
 
@@ -124,7 +124,7 @@ pub trait ISolver {
     fn backend(&self) -> &LeafBackend;
 }
 
-impl ::std::fmt::Debug for ISolver {
+impl ::std::fmt::Debug for SolverWorker {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "({})", "ILayer")
     }
@@ -333,7 +333,7 @@ pub enum SolverKind {
 
 impl SolverKind {
     /// Create a Solver of the specified kind with the supplied SolverConfig.
-    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<ISolver> {
+    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<SolverWorker> {
         match *self {
             SolverKind::SGD(sgd) => {
                 sgd.with_config(backend, config)
@@ -352,7 +352,7 @@ pub enum SGDKind {
 
 impl SGDKind {
     /// Create a Solver of the specified kind with the supplied SolverConfig.
-    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<ISolver> {
+    pub fn with_config(&self, backend: Rc<LeafBackend>, config: &SolverConfig) -> Box<SolverWorker> {
         match *self {
             SGDKind::Momentum => {
                 Box::new(Momentum::new(backend))
