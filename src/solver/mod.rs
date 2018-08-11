@@ -8,13 +8,11 @@ pub mod confusion_matrix;
 pub use self::confusion_matrix::ConfusionMatrix;
 
 use std::rc::Rc;
-use std::marker::PhantomData;
 use layer::*;
 use layers::SequentialConfig;
 use solvers::*;
 
 use crate::typedefs::{ArcLockTensor, LeafBackend};
-use parenchyma::prelude::SharedTensor;
 
 #[derive(Debug)]
 /// Solver that optimizes a [Layer][1] with a given objective.

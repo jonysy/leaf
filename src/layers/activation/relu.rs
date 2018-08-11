@@ -20,81 +20,21 @@ pub struct ReLU;
 // ReLU + ReLUPointwise
 // Only on CUDA
 //
-#[cfg(all(feature="cuda", not(feature="native")))]
-impl ILayer for ReLU {
-    impl_ilayer_activation!();
-
-    fn compute_in_place(&self) -> bool {
-        true
-    }
-
-    fn reshape(&mut self,
-               backend: ::std::rc::Rc<LeafBackend>,
-               input_data: &mut Vec<ArcLockTensor>,
-               input_gradient: &mut Vec<ArcLockTensor>,
-               weights_data: &mut Vec<ArcLockTensor>,
-               weights_gradient: &mut Vec<ArcLockTensor>,
-               output_data: &mut Vec<ArcLockTensor>,
-               output_gradient: &mut Vec<ArcLockTensor>) {
-        if let Some(inp) = input_data.get(0) {
-            let read_inp = inp.read().unwrap();
-            let input_desc = read_inp.shape();
-            input_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_data[0].write().unwrap().resize(input_desc.clone()).unwrap();
-            output_gradient[0].write().unwrap().resize(input_desc.clone()).unwrap();
-        }
-    }
-}
-
-#[cfg(all(feature="cuda", not(feature="native")))]
-impl ComputeOutput<f32> for ReLU {
-    fn compute_output(&self,
-                      backend: &LeafBackend,
-                      _weights: &[&SharedTensor<f32>],
-                      input_data: &[&SharedTensor<f32>],
-                      output_data: &mut [&mut SharedTensor<f32>]) {
-        match input_data.get(0) {
-            Some(input) => backend.relu_plain(input, output_data[0]).unwrap(),
-            None => backend.relu_pointwise_plain(output_data[0]).unwrap(),
-        }
-    }
-}
-
-#[cfg(all(feature="cuda", not(feature="native")))]
-impl ComputeInputGradient<f32> for ReLU {
-    fn compute_input_gradient(&self,
-                              backend: &LeafBackend,
-                              weights_data: &[&SharedTensor<f32>],
-                              output_data: &[&SharedTensor<f32>],
-                              output_gradients: &[&SharedTensor<f32>],
-                              input_data: &[&SharedTensor<f32>],
-                              input_gradients: &mut [&mut SharedTensor<f32>]) {
-        match output_data.get(0) {
-            Some(_) => backend.relu_grad_plain(output_data[0], output_gradients[0], input_data[0], input_gradients[0]).unwrap(),
-            None => backend.relu_pointwise_grad_plain(input_data[0], input_gradients[0]).unwrap(),
-        }
-    }
-}
-
-#[cfg(all(feature="cuda", not(feature="native")))]
-impl ComputeParametersGradient<f32> for ReLU {}
-
-//
 // ReLU without ReLUPointwise
-// Only on CUDA
+// Only on Native
 //
-#[cfg(feature="native")]
 impl ILayer for ReLU {
     impl_ilayer_activation!();
 
     fn reshape(&mut self,
-               backend: ::std::rc::Rc<LeafBackend>,
-               input_data: &mut Vec<ArcLockTensor>,
-               input_gradient: &mut Vec<ArcLockTensor>,
-               weights_data: &mut Vec<ArcLockTensor>,
-               weights_gradient: &mut Vec<ArcLockTensor>,
-               output_data: &mut Vec<ArcLockTensor>,
-               output_gradient: &mut Vec<ArcLockTensor>) {
+        backend: ::std::rc::Rc<LeafBackend>,
+        input_data: &mut Vec<ArcLockTensor>,
+        input_gradient: &mut Vec<ArcLockTensor>,
+        weights_data: &mut Vec<ArcLockTensor>,
+        weights_gradient: &mut Vec<ArcLockTensor>,
+        output_data: &mut Vec<ArcLockTensor>,
+        output_gradient: &mut Vec<ArcLockTensor>) {
+
         if let Some(inp) = input_data.get(0) {
             let read_inp = inp.read().unwrap();
             let input_desc = read_inp.shape();
@@ -105,35 +45,51 @@ impl ILayer for ReLU {
     }
 }
 
-#[cfg(feature="native")]
 impl ComputeOutput<f32> for ReLU {
     fn compute_output(&self,
-                      backend: &LeafBackend,
-                      _weights: &[&SharedTensor<f32>],
-                      input_data: &[&SharedTensor<f32>],
-                      output_data: &mut [&mut SharedTensor<f32>]) {
+        backend: &LeafBackend,
+        _weights: &[&SharedTensor<f32>],
+        input_data: &[&SharedTensor<f32>],
+        output_data: &mut [&mut SharedTensor<f32>]) {
+
         match input_data.get(0) {
-            Some(input) => backend.relu_plain(input, output_data[0]).unwrap(),
-            None => panic!("No input provided for ReLU layer."),
+            Some(input) => {
+                backend.relu(input, output_data[0]).unwrap()
+            }
+            None => {
+                panic!("No input provided for ReLU layer.")
+                // TODO
+                // backend.relu_pointwise(output_data[0]).unwrap(),
+            }
         }
     }
 }
 
-#[cfg(feature="native")]
 impl ComputeInputGradient<f32> for ReLU {
     fn compute_input_gradient(&self,
-                              backend: &LeafBackend,
-                              weights_data: &[&SharedTensor<f32>],
-                              output_data: &[&SharedTensor<f32>],
-                              output_gradients: &[&SharedTensor<f32>],
-                              input_data: &[&SharedTensor<f32>],
-                              input_gradients: &mut [&mut SharedTensor<f32>]) {
+        backend: &LeafBackend,
+        weights_data: &[&SharedTensor<f32>],
+        output_data: &[&SharedTensor<f32>],
+        output_gradients: &[&SharedTensor<f32>],
+        input_data: &[&SharedTensor<f32>],
+        input_gradients: &mut [&mut SharedTensor<f32>]) {
+
         match output_data.get(0) {
-            Some(_) => backend.relu_grad_plain(output_data[0], output_gradients[0], input_data[0], input_gradients[0]).unwrap(),
-            None => panic!("No output_data provided for ReLU layer backward."),
+            Some(_) => {
+                backend.relu_grad(
+                    output_data[0], 
+                    output_gradients[0], 
+                    input_data[0], 
+                    input_gradients[0]
+                ).unwrap()
+            }
+            None => {
+                panic!("No output_data provided for ReLU layer backward.")
+                // TODO
+                // backend.relu_pointwise_grad(input_data[0], input_gradients[0]).unwrap(),
+            }
         }
     }
 }
 
-#[cfg(feature="native")]
 impl ComputeParametersGradient<f32> for ReLU {}

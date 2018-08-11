@@ -16,7 +16,6 @@ use leaf_capnp::layer_config::layer_type as capnp_layer_type;
 use capnp_util::*;
 
 use crate::typedefs::{ArcLockTensor, ArcLockTensorBlob, LeafBackend, WeightArcLockTensorBlob};
-use parenchyma::frameworks::Native;
 use parenchyma::prelude::SharedTensor;
 use std::{cmp, fmt};
 
@@ -461,11 +460,6 @@ impl Layer {
             self.input_blobs_data[input_i].write().unwrap().reshape(reshaped_shape.clone()).unwrap();
         }
 
-        self.worker.sync(&self.backend,
-                         &mut self.input_blobs_data, &mut self.input_blobs_gradient,
-                         &mut self.weights_data, &mut self.weights_gradient,
-                         &mut self.output_blobs_data, &mut self.output_blobs_gradient);
-
         let forward_time = timeit_loops!(1, {
             if self.is_using_in_place() {
                 self.worker.forward(&self.backend, &vec![], &self.weights_data, &mut self.output_blobs_data);
@@ -498,11 +492,6 @@ impl Layer {
             self.output_blobs_gradient[output_i] = output.clone();
         }
 
-        self.worker.sync(&self.backend,
-                         &mut self.input_blobs_data, &mut self.input_blobs_gradient,
-                         &mut self.weights_data, &mut self.weights_gradient,
-                         &mut self.output_blobs_data, &mut self.output_blobs_gradient);
-
         if self.is_using_in_place() {
             self.worker.backward_input(&self.backend,
                                  &self.weights_data,
@@ -528,11 +517,6 @@ impl Layer {
     ///
     /// This method is mostly used when doing backpropagation.
     pub fn backward_parameters(&mut self) {
-        self.worker.sync(&self.backend,
-                         &mut self.input_blobs_data, &mut self.input_blobs_gradient,
-                         &mut self.weights_data, &mut self.weights_gradient,
-                         &mut self.output_blobs_data, &mut self.output_blobs_gradient);
-
         self.worker.backward_parameters(&self.backend,
                              &self.output_blobs_data,
                              &self.output_blobs_gradient,
@@ -554,7 +538,7 @@ impl Layer {
     ///
     /// [3]: ../solver/enum.LRPolicy.html
     pub fn update_weights(&mut self, backend: &LeafBackend) {
-        let mut shared_a = SharedTensor::scalar(-1f32);
+        let shared_a = SharedTensor::scalar(-1f32);
         for (weight_gradient, weight_data) in self.learnable_weights_gradients().iter().zip(&mut self.learnable_weights_data()) {
             backend.axpy(&shared_a, &weight_gradient.read().unwrap(), &mut weight_data.write().unwrap()).unwrap();
         }
@@ -1018,74 +1002,6 @@ pub trait ILayer : ComputeOutput<f32> + ComputeInputGradient<f32> + ComputeParam
         self.compute_parameters_gradient(backend, &output_data_, &output_gradients_, &input_data_, &mut weights_gradients_);
     }
 
-    /// Synchronize the blobs before doing a forward or backward operation.
-    ///
-    /// This is necessary because the forward_layer and backward_layer methods only immutably
-    /// borrow the corresponding input blobs and weights which they are not supposed to change.
-    /// However synchronizing all blobs to the same device may be neccessary for some computations,
-    /// which can only be done with a mutable borrow.
-    fn sync(&self,
-            backend: &LeafBackend,
-            input_data: &mut [ArcLockTensor],
-            input_gradients: &mut [ArcLockTensor],
-            weights_data: &mut [ArcLockTensor],
-            weights_gradients: &mut [ArcLockTensor],
-            output_data: &mut Vec<ArcLockTensor>,
-            output_gradients: &mut Vec<ArcLockTensor>) {
-        // if self.sync_native() {
-        //     let backend = native_backend();
-        //     for tensor in input_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in input_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in weights_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in weights_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in output_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in output_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        // } else {
-        //     for tensor in input_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in input_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in weights_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in weights_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in output_data {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        //     for tensor in output_gradients {
-        //         let mut sync = tensor.write().unwrap();
-        //         match sync.add_device(backend.device()) { _ => sync.sync(backend.device()).unwrap() }
-        //     }
-        // }
-    }
-
     /// Return whether "anonymous" output blobs are created automatically for the layer.
     ///
     /// If this method returns true, Network::init will create enough "anonymous" output
@@ -1341,14 +1257,8 @@ impl LayerType {
             LayerType::Pooling(_) => false,
             LayerType::Sequential(_) => false,
             LayerType::Softmax => false,
-            #[cfg(all(feature="cuda", not(feature="native")))]
             LayerType::ReLU => true,
-            #[cfg(feature="native")]
-            LayerType::ReLU => false,
-            #[cfg(all(feature="cuda", not(feature="native")))]
             LayerType::Sigmoid => true,
-            #[cfg(feature="native")]
-            LayerType::Sigmoid => false,
             LayerType::NegativeLogLikelihood(_) => false,
             LayerType::Reshape(_) => true,
         }
@@ -1370,13 +1280,7 @@ impl<'a> CapnpWrite<'a> for LayerType {
             &LayerType::Pooling(ref cfg) => { let ref mut config = builder.borrow().init_pooling(); cfg.write_capnp(config); },
             &LayerType::Sequential(ref cfg) => { let ref mut config = builder.borrow().init_sequential(); cfg.write_capnp(config); },
             &LayerType::Softmax => { builder.set_softmax(()) },
-            #[cfg(all(feature="cuda", not(feature="native")))]
             &LayerType::ReLU => { builder.set_relu(()) },
-            #[cfg(feature="native")]
-            &LayerType::ReLU => { builder.set_relu(()) },
-            #[cfg(all(feature="cuda", not(feature="native")))]
-            &LayerType::Sigmoid => { builder.set_sigmoid(()) },
-            #[cfg(feature="native")]
             &LayerType::Sigmoid => { builder.set_sigmoid(()) },
             &LayerType::NegativeLogLikelihood(ref cfg) => { let ref mut config = builder.borrow().init_negative_log_likelihood(); cfg.write_capnp(config); },
             &LayerType::Reshape(ref cfg) => { let ref mut config = builder.borrow().init_reshape(); cfg.write_capnp(config); },

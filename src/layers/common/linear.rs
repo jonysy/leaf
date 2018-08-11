@@ -25,7 +25,7 @@ use leaf_capnp::linear_config as capnp_config;
 use capnp_util::*;
 
 use crate::typedefs::{ArcLockTensor, LeafBackend};
-use parenchyma::prelude::{SharedTensor, TensorShape};
+use parenchyma::prelude::SharedTensor;
 use parenchyma_blas::Transposition;
 
 #[derive(Debug)]

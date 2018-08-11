@@ -34,7 +34,7 @@ pub mod sgd;
 use solver::*;
 use layer::*;
 
-use crate::typedefs::{ArcLockTensor, LeafBackend};
+use crate::typedefs::ArcLockTensor;
 use parenchyma::prelude::SharedTensor;
 
 trait SGDSolver : ISolver {

@@ -127,7 +127,6 @@ pub mod layers;
 pub mod solver;
 pub mod solvers;
 pub mod typedefs;
-// pub mod util;
 pub mod utilities;
 pub mod weight;
 
