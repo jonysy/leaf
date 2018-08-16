@@ -28,13 +28,13 @@
 //! [backprop]: https://en.wikipedia.org/wiki/Backpropagation
 
 #[allow(unused_import_braces)]
+pub use crate::solvers::core::*;
 pub use self::sgd::Momentum;
 pub mod core;
 pub mod sgd;
 
 use crate::layers::core::*;
 use crate::layers::SequentialConfig;
-use crate::solvers::core::*;
 use crate::typedefs::ArcLockTensor;
 
 use parenchyma::prelude::SharedTensor;

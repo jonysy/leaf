@@ -41,7 +41,25 @@ impl NegativeLogLikelihood {
 }
 
 impl LayerWorker for NegativeLogLikelihood {
-    impl_ilayer_loss!();
+    fn exact_num_output_blobs(&self) -> Option<usize> {
+        return Some(1);
+    }
+    
+    fn exact_num_input_blobs(&self) -> Option<usize> {
+        return Some(1);
+    }
+
+    fn auto_output_blobs(&self) -> bool {
+        return true;
+    }
+
+    fn loss_weight(&self, output_id: usize) -> Option<f32> {
+        if output_id == 0 {
+            Some(1f32)
+        } else {
+            None
+        }
+    }
 
     fn sync_native(&self) -> bool {
         true

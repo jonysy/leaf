@@ -53,6 +53,7 @@
 /// [2]: ./layers/activation/index.html
 
 pub use self::activation::{ReLU, Sigmoid, TanH};
+pub use self::core::*;
 
 #[cfg(all(feature="cuda", not(feature="native")))]
 pub use self::common::{

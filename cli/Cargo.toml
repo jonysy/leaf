@@ -1,0 +1,51 @@
+[package]
+name = "leaf-examples"
+description = "Examples for the Machine Learning Framework 'Leaf'"
+version = "0.1.0"
+authors = [
+    "Michael Hirn <mj@autumnai.com>",
+    "Maximilian Goisser <max@autumnai.com>"
+]
+
+[dependencies]
+csv = "1.0.0"
+docopt = "1.0.0"
+env_logger = "0.5.12"
+hyper = "0.12.8"
+hyper-tls = "0.3.0"
+log = "0.4.0"
+serde = "1.0"
+serde_derive = "1.0"
+tokio = "0.1.7"
+
+[dependencies.leaf]
+path = ".."
+version = "0.3.0"
+[dependencies.parenchyma]
+path = "../../parenchyma"
+[dependencies.parenchyma-ml]
+path = "../../parenchyma-ml"
+
+# # cuticula = "0.1.4"
+# leaf = { version = "0.2.0", default-features = false }
+# collenchyma = { version = "0.0.8", default-features = false }
+
+# csv = "0.14"
+# hyper = "0.6"
+
+# log = "0.3"
+# env_logger = "0.3"
+
+# # CLI tooling
+# docopt = "0.6.75"
+# rustc-serialize = "0.3"
+
+# clippy = { version = "0.0.23", optional = true }
+
+# [profile.dev]
+# opt-level = 0
+# debug = true
+# rpath = false
+# lto = false
+# debug-assertions = true
+# codegen-units = 2
