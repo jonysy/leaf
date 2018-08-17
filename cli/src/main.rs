@@ -37,8 +37,8 @@ const USAGE: &'static str = "
 Leaf Examples
 
 Usage:
-    leaf-examples load-dataset <dataset-name>
-    leaf-examples mnist <model-name> [--batch-size <batch-size>] [--learning-rate <learning-rate>] [--momentum <momentum>]
+    leaf-examples mnist <model-name> [--batch-size <batch-size>] [--learning-rate <learning-rate>] \
+    [--momentum <momentum>]
     leaf-examples (-h | --help)
     leaf-examples --version
 
@@ -51,12 +51,10 @@ Options:
 
 #[derive(Debug, Deserialize)]
 struct Args {
-    arg_dataset_name: Option<String>,
     arg_model_name: Option<String>,
     arg_batch_size: Option<usize>,
     arg_learning_rate: Option<f32>,
     arg_momentum: Option<f32>,
-    cmd_load_dataset: bool,
     cmd_mnist: bool,
 }
 
@@ -68,28 +66,21 @@ fn main() {
             .and_then(|d| d.deserialize())
                 .unwrap_or_else(|e| e.exit());
 
-    if args.cmd_load_dataset {
-        match args.arg_dataset_name.unwrap().as_ref() {
-            "mnist" => {
-                let ref mut rt = Runtime::new().unwrap();
-                let ref client = Client::builder().build(HttpsConnector::new(4).unwrap());
-                ["mnist_test.csv", "mnist_train.csv"]
-                    .iter()
-                        .for_each(|path| fetch(rt, client, path));
-                println!("MNIST dataset downloaded");
-            }
-            _ => {
-                println!("Failed to download MNIST dataset!");
-            }
-        }
-    } else if args.cmd_mnist {
-        run_mnist(
-            args.arg_model_name.unwrap_or("none".to_owned()), 
-            args.arg_batch_size.unwrap_or(1), 
-            args.arg_learning_rate.unwrap_or(0.001f32), 
-            args.arg_momentum.unwrap_or(0f32)
-        );
-    }
+    let ref mut rt = Runtime::new().unwrap();
+    let ref client = Client::builder().build(HttpsConnector::new(4).unwrap());
+    
+    ["mnist_test.csv", "mnist_train.csv"]
+        .iter()
+            .for_each(|path| fetch(rt, client, path));
+
+    println!("MNIST dataset downloaded");
+
+    run_mnist(
+        args.arg_model_name.unwrap_or("none".to_owned()), 
+        args.arg_batch_size.unwrap_or(1), 
+        args.arg_learning_rate.unwrap_or(0.001f32), 
+        args.arg_momentum.unwrap_or(0f32)
+    );
 }
 
 
@@ -122,7 +113,7 @@ fn fetch(runtime: &mut Runtime, client: &Client<HttpsConnector<HttpConnector>, B
 
         runtime.block_on(work).unwrap()
     } else {
-        println!("`{}` already downloaded..", path);
+        println!("{} downloaded", path);
     }
 }
 
@@ -221,7 +212,7 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
     let in_lock: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from([batch_size, 1, 28, 28])));
     let label_lock: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from([batch_size, 1])));
 
-    for _ in 0..(60000 / batch_size) {
+    for i in 0..(60_000 / batch_size) {
         let mut targets: Vec<usize> = 
             decoded_images
                 .by_ref()
@@ -241,7 +232,15 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
         let mut infered = infered_out.write().unwrap();
         let predictions = confusion.get_predictions(&mut infered);
         confusion.add_samples(&predictions, &targets);
-        println!("Last sample: {} | Accuracy {}",
-            confusion.samples().iter().last().unwrap(), confusion.accuracy());
+        
+        let conf_spl = confusion.samples().iter().last().unwrap();
+        let conf_accy = confusion.accuracy();
+
+        let cond_a = (i % 10_000) == 0;
+        let cond_b = (60_000 / batch_size - 1) == i;
+
+        //if cond_a || cond_b {
+            println!("Iteration: {} | Last sample: {} | Accuracy {}", i + 1, conf_spl, conf_accy);
+        //}
     }
 }

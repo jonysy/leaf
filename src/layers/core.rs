@@ -1260,8 +1260,8 @@ impl LayerType {
             LayerType::Pooling(_) => false,
             LayerType::Sequential(_) => false,
             LayerType::Softmax => false,
-            LayerType::ReLU => true,
-            LayerType::Sigmoid => true,
+            LayerType::ReLU => false,
+            LayerType::Sigmoid => false,
             LayerType::NegativeLogLikelihood(_) => false,
             LayerType::Reshape(_) => true,
         }
