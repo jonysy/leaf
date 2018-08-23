@@ -24,7 +24,7 @@ version = "0.3.0"
 [dependencies.parenchyma]
 path = "../../parenchyma"
 [dependencies.parenchyma-ml]
-path = "../../parenchyma-ml"
+path = "../../parenchyma/crates/parenchyma-ml"
 
 # # cuticula = "0.1.4"
 # leaf = { version = "0.2.0", default-features = false }

@@ -22,7 +22,8 @@ use hyper_tls::HttpsConnector;
 use leaf::layers::*;
 use leaf::solvers::*;
 use leaf::typedefs::ArcLockTensor;
-use parenchyma::frameworks::Native;
+use parenchyma::frameworks::{Native, OpenCL};
+use parenchyma::hardware::HardwareKind;
 use parenchyma::prelude::{Backend, SharedTensor};
 use parenchyma_ml::Package as MachLrnPackage;
 use std::fs::File;
@@ -31,7 +32,7 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 
-type NativeMachLrnPackage = Native<MachLrnPackage>;
+// type NativeMachLrnPackage = OpenCL<MachLrnPackage>;
 
 const USAGE: &'static str = "
 Leaf Examples
@@ -83,7 +84,6 @@ fn main() {
     );
 }
 
-
 fn fetch(runtime: &mut Runtime, client: &Client<HttpsConnector<HttpConnector>, Body>, path: &str) {
     let file_path = Path::new("assets").join(path);
 
@@ -118,39 +118,32 @@ fn fetch(runtime: &mut Runtime, client: &Client<HttpsConnector<HttpConnector>, B
 }
 
 fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum: f32) {
+    const LEN: usize = 28;
+
     let mut reader = Reader::from_path("assets/mnist_train.csv").unwrap();
     let mut decoded_images = 
-        reader.deserialize().map(|row| match row {
-            Ok(value) => {
-                let row_vec: Box<Vec<u8>> = Box::new(value);
-                let label = row_vec[0];
-                let mut pixels = vec![0u8; 784];
-                for (place, element) in pixels.iter_mut().zip(row_vec.iter().skip(1)) {
-                    *place = *element;
-                }
+        reader.deserialize().map(|row: Result<Vec<u8>, _>| match row {
+            Ok(mut value) => {
 
                 // TODO: reintroduce pre-processing framework
-                // let img = Image::from_luma_pixels(28, 28, pixels);
+                // let img = Image::from_luma_pixels(LEN, LEN, pixels);
                 // match img {
                 //     Ok(in_img) => {
-                //         println!("({}): {:?}", label, in_img.transform(vec![28, 28]));
+                //         println!("({}): {:?}", label, in_img.transform(vec![LEN, LEN]));
                 //     },
                 //     _ => unimplemented!()
                 // }
 
-                (label, pixels)
+                (value.remove(0), value)
             }
 
-            _ => {
-                println!("no value");
-                panic!();
-            }
+            _ => panic!("no value"),
         });
 
 // -------------------------------------------------------------------------------------------------
 
     let mut net_cfg = SequentialConfig::default();
-    net_cfg.add_input("data", &[batch_size, 28, 28]);
+    net_cfg.add_input("data", &[batch_size, LEN, LEN]);
     net_cfg.force_backward = true;
 
     match model_name.as_ref() {
@@ -159,12 +152,13 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
         }
 
         "mlp" => {
-            net_cfg.add_layer(LayerConfig::new("reshape", 
-                LayerType::Reshape(ReshapeConfig::of_shape(&[batch_size, 784]))));
-            net_cfg.add_layer(LayerConfig::new("linear1", 
+            net_cfg.add_layer(LayerConfig::new("reshape",
+                LayerType::Reshape(ReshapeConfig::of_shape(&[batch_size, LEN * LEN]))));
+            net_cfg.add_layer(LayerConfig::new("linear1",
                 LayerType::Linear(LinearConfig { output_size: 1568 })));
-            net_cfg.add_layer(LayerConfig::new("sigmoid", LayerType::Sigmoid));
-            net_cfg.add_layer(LayerConfig::new("linear2", 
+            net_cfg.add_layer(LayerConfig::new("sigmoid",
+                LayerType::Sigmoid));
+            net_cfg.add_layer(LayerConfig::new("linear2",
                 LayerType::Linear(LinearConfig { output_size: 10 })));
         }
 
@@ -189,8 +183,16 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
     classifier_cfg.add_layer(nll_cfg);
 
     // set up backends
+    
     let backend = ::std::rc::Rc::new(
-        Backend::new::<NativeMachLrnPackage>().unwrap());
+        Backend::new::<Native<MachLrnPackage>>().unwrap());
+
+    // let backend = ::std::rc::Rc::new({
+    //     let mut b = Backend::new::<OpenCL<MachLrnPackage>>().unwrap();
+    //     // required for GEMM!
+    //     b.select(&|hardware| hardware.kind == HardwareKind::GPU);
+    //     b
+    // });
 
     // set up solver
     let solver_cfg = SolverConfig {
@@ -209,7 +211,7 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
 
 // -------------------------------------------------------------------------------------------------
 
-    let in_lock: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from([batch_size, 1, 28, 28])));
+    let in_lock: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from([batch_size, 1, LEN, LEN])));
     let label_lock: ArcLockTensor = Arc::new(RwLock::new(SharedTensor::from([batch_size, 1])));
 
     for i in 0..(60_000 / batch_size) {
@@ -239,8 +241,8 @@ fn run_mnist(model_name: String, batch_size: usize, learning_rate: f32, momentum
         let cond_a = (i % 10_000) == 0;
         let cond_b = (60_000 / batch_size - 1) == i;
 
-        //if cond_a || cond_b {
-            println!("Iteration: {} | Last sample: {} | Accuracy {}", i + 1, conf_spl, conf_accy);
-        //}
+        if cond_a || cond_b {
+            println!("Iteration: {} | Last sample: {} | Accuracy {}", i, conf_spl, conf_accy);
+        }
     }
 }

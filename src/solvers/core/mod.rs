@@ -47,7 +47,6 @@ impl Solver {
             config: config.clone(),
         }
     }
-
 }
 
 impl Solver {

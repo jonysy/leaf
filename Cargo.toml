@@ -28,11 +28,11 @@ timeit = "0.1.2"
 [dependencies.parenchyma]
 path = "../parenchyma"
 [dependencies.parenchyma-blas]
-path = "../parenchyma-blas"
+path = "../parenchyma/crates/parenchyma-blas"
 [dependencies.parenchyma-deep]
-path = "../parenchyma-deep"
+path = "../parenchyma/crates/parenchyma-deep"
 [dependencies.parenchyma-ml]
-path = "../parenchyma-ml"
+path = "../parenchyma/crates/parenchyma-ml"
 
 [build-dependencies]
 capnpc = "0.6.1"
