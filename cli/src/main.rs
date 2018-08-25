@@ -32,7 +32,7 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 
-// type NativeMachLrnPackage = OpenCL<MachLrnPackage>;
+// type NativeMachLrnPackage = _<MachLrnPackage>;
 
 const USAGE: &'static str = "
 Leaf Examples
